@@ -1,6 +1,8 @@
-import { motion } from 'motion/react';
-import { Music, MapPin, Share2, Heart } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Music, MapPin, Share2, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './ui/Button';
+import { cn } from '../lib/utils';
 
 interface PostcardProps {
   key?: string;
@@ -17,23 +19,78 @@ interface PostcardProps {
 }
 
 export const Postcard = ({ mediaUrls, caption, location, date, musicTrack }: PostcardProps) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const formatDate = (dateStr: string, options: Intl.DateTimeFormatOptions) => {
+    if (!dateStr) return '';
+    
+    // If it's a date-only string (YYYY-MM-DD)
+    if (dateStr.includes('-') && !dateStr.includes('T')) {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      return new Date(year, month - 1, day).toLocaleDateString('en-US', options);
+    }
+    
+    // Fallback for full ISO strings
+    return new Date(dateStr).toLocaleDateString('en-US', options);
+  };
+
+  const next = () => setCurrentIndex((prev) => (prev + 1) % mediaUrls.length);
+  const prev = () => setCurrentIndex((prev) => (prev - 1 + mediaUrls.length) % mediaUrls.length);
+
   return (
     <div className="max-w-2xl mx-auto bg-white shadow-2xl rounded-sm overflow-hidden border-[12px] border-white">
-      {/* Media Carousel (Simplified for V1) */}
-      <div className="aspect-square relative bg-canvas overflow-hidden">
-        <img
-          src={mediaUrls[0]}
-          alt="Postcard media"
-          className="w-full h-full object-cover"
-          referrerPolicy="no-referrer"
-        />
+      {/* Media Carousel */}
+      <div className="aspect-square relative bg-canvas overflow-hidden group">
+        <AnimatePresence mode="wait">
+          <motion.img
+            key={currentIndex}
+            src={mediaUrls[currentIndex]}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            alt="Postcard media"
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        </AnimatePresence>
+
+        {mediaUrls.length > 1 && (
+          <>
+            <button 
+              onClick={prev}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button 
+              onClick={next}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <ChevronRight size={20} />
+            </button>
+            
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {mediaUrls.map((_, i) => (
+                <div 
+                  key={i} 
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full transition-all",
+                    i === currentIndex ? "bg-white w-4" : "bg-white/40"
+                  )} 
+                />
+              ))}
+            </div>
+          </>
+        )}
         
         {/* Stamp/Postmark Overlay */}
         <div className="absolute top-6 right-6 w-24 h-24 opacity-20 pointer-events-none rotate-12">
           <svg viewBox="0 0 100 100" className="w-full h-full fill-charcoal">
             <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
             <text x="50" y="45" textAnchor="middle" className="text-[10px] font-serif uppercase tracking-tighter">Folio</text>
-            <text x="50" y="60" textAnchor="middle" className="text-[8px] font-sans uppercase tracking-widest">{date}</text>
+            <text x="50" y="60" textAnchor="middle" className="text-[8px] font-sans uppercase tracking-widest">
+              {formatDate(date, { month: 'short', year: '2-digit' })}
+            </text>
           </svg>
         </div>
       </div>
@@ -49,7 +106,7 @@ export const Postcard = ({ mediaUrls, caption, location, date, musicTrack }: Pos
               </div>
             )}
             <div className="text-charcoal/40 text-xs uppercase tracking-widest font-bold">
-              {new Date(date).toLocaleDateString('en-US', {
+              {formatDate(date, {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric',

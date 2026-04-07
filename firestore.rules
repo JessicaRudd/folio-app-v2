@@ -12,7 +12,8 @@ service cloud.firestore {
     }
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
          (request.auth.token.email == "jess@irudd.com" && request.auth.token.email_verified == true));
     }
     function isValidEmail(email) {
@@ -21,49 +22,102 @@ service cloud.firestore {
     function isValidUrl(url) {
       return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
     }
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    function validString(field, maxLen) {
+      return request.resource.data[field] is string && request.resource.data[field].size() <= maxLen;
+    }
 
     // ===============================================================
     // Domain Validators
     // ===============================================================
     function isValidUser(data) {
-      return data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'role', 'total_storage_used', 'monthly_postcard_count']) &&
-             data.uid is string && data.email is string && isValidEmail(data.email);
+      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'role', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'monthly_postcard_count', 'createdAt', 'updatedAt'];
+      return data.keys().hasOnly(allowedFields) &&
+             data.uid is string && data.uid.size() < 100 &&
+             data.email is string && isValidEmail(data.email) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() < 1000)) &&
+             (!('username' in data) || (data.username is string && data.username.size() < 50)) &&
+             (!('profilePrivacy' in data) || data.profilePrivacy in ['private', 'public']);
     }
+
     function isValidFolio(data) {
-      return data.keys().hasAll(['id', 'creatorId', 'title']) &&
-             data.id is string && data.creatorId is string && data.title is string;
+      let allowedFields = ['id', 'creatorId', 'title', 'description', 'location', 'coverImage', 'privacy', 'allowedUsers', 'createdAt', 'postcardCount', 'folioDate', 'photoCount', 'creatorName', 'creatorUsername'];
+      return data.keys().hasOnly(allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
+             data.creatorId is string && data.creatorId.size() < 100 &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             (!('description' in data) || (data.description is string && data.description.size() < 500)) &&
+             (!('location' in data) || (data.location is string && data.location.size() < 100)) &&
+             (!('privacy' in data) || data.privacy in ['private', 'personal', 'public']) &&
+             (!('folioDate' in data) || (data.folioDate is string && data.folioDate.size() < 20)) &&
+             (!('allowedUsers' in data) || (data.allowedUsers is list && data.allowedUsers.size() < 100)) &&
+             (!('postcardCount' in data) || data.postcardCount is number) &&
+             (!('photoCount' in data) || data.photoCount is number) &&
+             (!('creatorName' in data) || (data.creatorName is string && data.creatorName.size() < 100)) &&
+             (!('creatorUsername' in data) || (data.creatorUsername is string && data.creatorUsername.size() < 100));
     }
+
     function isValidPostcard(data) {
-      return data.keys().hasAll(['id', 'folioId', 'creatorId', 'mediaUrls', 'secureToken']) &&
-             data.id is string && data.folioId is string && data.creatorId is string &&
-             data.mediaUrls is list && data.secureToken is string;
+      let requiredFields = ['folioId', 'creatorId', 'mediaUrls', 'secureToken'];
+      let allowedFields = ['id', 'folioId', 'creatorId', 'mediaUrls', 'caption', 'location', 'musicTrack', 'secureToken', 'createdAt', 'visibilityList', 'postcardDate'];
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(allowedFields) &&
+             (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
+             data.folioId is string && data.folioId.size() < 100 &&
+             data.creatorId is string && data.creatorId.size() < 100 &&
+             data.mediaUrls is list && data.mediaUrls.size() > 0 && data.mediaUrls.size() < 20 &&
+             data.secureToken is string && data.secureToken.size() < 100 &&
+             (!('caption' in data) || (data.caption is string && data.caption.size() < 2000)) &&
+             (!('location' in data) || (data.location is string && data.location.size() < 100)) &&
+             (!('postcardDate' in data) || (data.postcardDate is string && data.postcardDate.size() < 20)) &&
+             (!('visibilityList' in data) || (data.visibilityList is list && data.visibilityList.size() < 100));
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
     match /users/{userId} {
+      // Protect PII: Only owner can read their own email. 
+      // Public profile fields should be in a separate collection if we want true public discovery,
+      // but for now we'll restrict read to owner or if profile is public (still risky if email is in there).
+      // Guideline: NEVER write a rule that allows read access to a document containing PII for anyone other than the owner.
+      // Since 'email' is in this doc, we MUST restrict read.
       allow read: if isOwner(userId) || isAdmin();
+      
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'creator';
       allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
     }
 
     match /folios/{folioId} {
-      allow read: if isAuthenticated() || isAdmin(); // For creators to see their own and others' if public (simplified for now)
+      allow read: if (resource.data.privacy == 'public') || 
+                   (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
+                    (resource.data.privacy == 'personal' && request.auth.token.email in resource.data.allowedUsers))) ||
+                   (resource.data.privacy == 'private' || !('privacy' in resource.data));
+      
       allow create: if isAuthenticated() && isValidFolio(request.resource.data) && request.resource.data.creatorId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidFolio(request.resource.data) && (resource.data.creatorId == request.auth.uid || isAdmin()) && request.resource.data.creatorId == resource.data.creatorId;
+      allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
 
     match /postcards/{postcardId} {
       // Allow read if the user is the creator or in the visibility list
-      allow get: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || request.auth.uid in resource.data.visibilityList));
+      allow get: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
+                    ('visibilityList' in resource.data && request.auth.uid in resource.data.visibilityList)));
       
       // Allow list (query) if the secureToken is provided in the query filter
       // This is the "No-Auth" guest access mechanism
-      allow list: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || request.auth.uid in resource.data.visibilityList)) ||
-                     (request.query.secureToken == resource.data.secureToken);
+      allow list: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
+                    ('visibilityList' in resource.data && request.auth.uid in resource.data.visibilityList))) ||
+                     (request.query.secureToken == resource.data.secureToken) ||
+                     (get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.privacy == 'public');
 
-      allow create: if isAuthenticated() && isValidPostcard(request.resource.data) && request.resource.data.creatorId == request.auth.uid;
+      allow create: if isAuthenticated() && (isAdmin() || (isValidPostcard(request.resource.data) && request.resource.data.creatorId == request.auth.uid));
       allow update, delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
   }

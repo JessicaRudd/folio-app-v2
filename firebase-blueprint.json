@@ -10,6 +10,9 @@
         "displayName": { "type": "string" },
         "photoURL": { "type": "string", "format": "uri" },
         "role": { "type": "string", "enum": ["admin", "creator"] },
+        "bio": { "type": "string" },
+        "username": { "type": "string" },
+        "profilePrivacy": { "type": "string", "enum": ["private", "public"] },
         "total_storage_used": { "type": "number" },
         "monthly_postcard_count": { "type": "number" }
       },
@@ -24,8 +27,16 @@
         "creatorId": { "type": "string" },
         "title": { "type": "string" },
         "description": { "type": "string" },
+        "location": { "type": "string" },
         "coverImage": { "type": "string", "format": "uri" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "privacy": { "type": "string", "enum": ["private", "personal", "public"] },
+        "allowedUsers": { "type": "array", "items": { "type": "string" } },
+        "folioDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "postcardCount": { "type": "number" },
+        "photoCount": { "type": "number" },
+        "creatorName": { "type": "string" },
+        "creatorUsername": { "type": "string" }
       },
       "required": ["id", "creatorId", "title"]
     },
@@ -42,6 +53,7 @@
         "musicTrackId": { "type": "string" },
         "visibilityList": { "type": "array", "items": { "type": "string" } },
         "secureToken": { "type": "string" },
+        "postcardDate": { "type": "string", "format": "date" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "folioId", "creatorId", "mediaUrls", "secureToken"]
