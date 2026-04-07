@@ -1,0 +1,29 @@
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - IMGPROXY_URL=http://localhost:8080
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - image-proc
+    # Cloud Run specific extensions
+    x-google-cloud-run:
+      service-account: folio-service-account@${PROJECT_ID}.iam.gserviceaccount.com
+      cpu: 1
+      memory: 512Mi
+      min-instances: 0
+      max-instances: 10
+
+  image-proc:
+    image: darthsim/imgproxy:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - IMGPROXY_BIND=0.0.0.0:8080
+      - IMGPROXY_LOCAL_FILESYSTEM_ROOT=/app/public
+    x-google-cloud-run:
+      cpu: 0.5
+      memory: 512Mi
