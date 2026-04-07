@@ -1,0 +1,8 @@
+{
+  "name": "Folio",
+  "description": "A privacy-forward social app for sharing digital postcards with friends and family. Curated, editorial, and secure.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the application",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "role": { "type": "string", "enum": ["admin", "creator"] },
+        "total_storage_used": { "type": "number" },
+        "monthly_postcard_count": { "type": "number" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Folio": {
+      "title": "Folio",
+      "description": "A collection of postcards",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "coverImage": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "creatorId", "title"]
+    },
+    "Postcard": {
+      "title": "Postcard",
+      "description": "A single postcard entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "folioId": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "mediaUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "caption": { "type": "string" },
+        "musicTrackId": { "type": "string" },
+        "visibilityList": { "type": "array", "items": { "type": "string" } },
+        "secureToken": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "folioId", "creatorId", "mediaUrls", "secureToken"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/folios/{folioId}": {
+      "schema": "Folio",
+      "description": "Folio collections"
+    },
+    "/postcards/{postcardId}": {
+      "schema": "Postcard",
+      "description": "Individual postcards"
+    }
+  }
+}
