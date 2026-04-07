@@ -55,16 +55,13 @@ service cloud.firestore {
     }
 
     match /postcards/{postcardId} {
-      // Guest access logic: allow read if secureToken matches
-      allow read: if (request.query.limit <= 100) || // Placeholder for list queries
-                     (resource.data.creatorId == request.auth.uid) ||
-                     (request.auth != null && request.auth.uid in resource.data.visibilityList) ||
-                     (request.query.secureToken == resource.data.secureToken); // Simplified guest access
+      // Allow read if the user is the creator or in the visibility list
+      allow get: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || request.auth.uid in resource.data.visibilityList));
       
-      // Better guest access for single document
-      allow get: if (resource.data.creatorId == request.auth.uid) ||
-                    (request.auth != null && request.auth.uid in resource.data.visibilityList) ||
-                    (request.params.secureToken == resource.data.secureToken); // This is not standard, but we'll use a query param or token in the doc
+      // Allow list (query) if the secureToken is provided in the query filter
+      // This is the "No-Auth" guest access mechanism
+      allow list: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || request.auth.uid in resource.data.visibilityList)) ||
+                     (request.query.secureToken == resource.data.secureToken);
 
       allow create: if isAuthenticated() && isValidPostcard(request.resource.data) && request.resource.data.creatorId == request.auth.uid;
       allow update, delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());

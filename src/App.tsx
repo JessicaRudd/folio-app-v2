@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { FolioGrid } from './components/FolioGrid';
 import { Postcard } from './components/Postcard';
+import { GuestView } from './components/GuestView';
 import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus } from 'lucide-react';
@@ -59,7 +61,7 @@ const MOCK_POSTCARDS = [
   },
 ];
 
-export default function App() {
+function CreatorDashboard() {
   const [user, setUser] = useState<any>(null);
   const [selectedFolioId, setSelectedFolioId] = useState<string | null>(null);
   const [view, setView] = useState<'grid' | 'postcard'>('grid');
@@ -177,5 +179,16 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<CreatorDashboard />} />
+        <Route path="/v/:folioId/:secureToken" element={<GuestView />} />
+      </Routes>
+    </Router>
   );
 }
