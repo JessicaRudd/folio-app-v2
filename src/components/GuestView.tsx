@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Postcard } from './Postcard';
 import { motion } from 'motion/react';
-import { Lock } from 'lucide-react';
+import { Lock, ArrowLeft } from 'lucide-react';
 
 export const GuestView = () => {
   const { folioId, secureToken } = useParams<{ folioId: string; secureToken: string }>();
+  const navigate = useNavigate();
   const [postcards, setPostcards] = useState<any[]>([]);
   const [folio, setFolio] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -91,6 +92,17 @@ export const GuestView = () => {
 
   return (
     <div className="min-h-screen bg-canvas py-20 px-6">
+      {secureToken === 'public' && (
+        <div className="max-w-4xl mx-auto mb-12">
+          <Link 
+            to="/explore"
+            className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
+          >
+            <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
+            Back to Explore
+          </Link>
+        </div>
+      )}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

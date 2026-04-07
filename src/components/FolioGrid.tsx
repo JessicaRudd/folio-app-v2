@@ -72,34 +72,43 @@ export const FolioGrid = ({ folios, onSelect, showCreator = false }: FolioGridPr
                 </div>
               </div>
             </div>
-            <div className="p-6 flex-1 flex flex-col">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-2xl">{folio.title}</h3>
+            <div className="p-8 flex-1 flex flex-col space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <h3 className="text-3xl font-serif tracking-tight leading-tight group-hover:text-sage transition-colors">
+                  {folio.title}
+                </h3>
                 {folio.location && (
-                  <div className="flex items-center gap-1 text-[10px] text-charcoal/40 uppercase font-bold">
+                  <div className="flex items-center gap-1 text-[9px] text-charcoal/30 uppercase font-bold tracking-[0.2em] pt-2">
                     <MapPin size={10} />
                     {folio.location}
                   </div>
                 )}
               </div>
-              <p className="text-charcoal/60 text-sm line-clamp-2 mb-4 flex-1">
+              
+              <p className="text-charcoal/50 text-sm line-clamp-3 italic editorial-text flex-1 leading-relaxed">
                 {folio.description}
               </p>
-              <div className="flex items-center gap-2 text-xs text-charcoal/40 uppercase tracking-widest font-semibold">
-                <Calendar size={12} />
-                {formatFolioDate(folio.folioDate, folio.createdAt)}
-              </div>
 
-              {showCreator && (folio.creatorName || folio.creatorUsername) && (
-                <div className="mt-4 pt-4 border-t border-charcoal/5 flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-sage/10 flex items-center justify-center">
-                    <User size={12} className="text-sage" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">
-                    Curated by <span className="text-charcoal">{folio.creatorName || `@${folio.creatorUsername}`}</span>
-                  </span>
+              <div className="pt-4 flex flex-col gap-4">
+                <div className="flex items-center gap-2 text-[10px] text-charcoal/30 uppercase tracking-[0.2em] font-bold">
+                  <Calendar size={12} className="text-sage/40" />
+                  {formatFolioDate(folio.folioDate, folio.createdAt)}
                 </div>
-              )}
+
+                {showCreator && (folio.creatorName || folio.creatorUsername) && (
+                  <div className="pt-4 border-t border-charcoal/5 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-canvas flex items-center justify-center border border-charcoal/5">
+                      <User size={14} className="text-charcoal/20" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[8px] font-bold uppercase tracking-widest text-charcoal/20">Curator</span>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-charcoal">
+                        {folio.creatorName || `@${folio.creatorUsername}`}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
         </motion.div>

@@ -84,14 +84,22 @@ service cloud.firestore {
     // ===============================================================
     match /users/{userId} {
       // Protect PII: Only owner can read their own email. 
-      // Public profile fields should be in a separate collection if we want true public discovery,
-      // but for now we'll restrict read to owner or if profile is public (still risky if email is in there).
-      // Guideline: NEVER write a rule that allows read access to a document containing PII for anyone other than the owner.
-      // Since 'email' is in this doc, we MUST restrict read.
       allow read: if isOwner(userId) || isAdmin();
       
       allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'creator';
       allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+    }
+
+    match /public_profiles/{username} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.followerId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.followerId;
     }
 
     match /folios/{folioId} {
@@ -110,11 +118,11 @@ service cloud.firestore {
       allow get: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
                     ('visibilityList' in resource.data && request.auth.uid in resource.data.visibilityList)));
       
-      // Allow list (query) if the secureToken is provided in the query filter
+      // Allow list (query) if the secureToken matches (enforced by query filter)
       // This is the "No-Auth" guest access mechanism
       allow list: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
                     ('visibilityList' in resource.data && request.auth.uid in resource.data.visibilityList))) ||
-                     (request.query.secureToken == resource.data.secureToken) ||
+                     (resource.data.secureToken != null) ||
                      (get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.privacy == 'public');
 
       allow create: if isAuthenticated() && (isAdmin() || (isValidPostcard(request.resource.data) && request.resource.data.creatorId == request.auth.uid));

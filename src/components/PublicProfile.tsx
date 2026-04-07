@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar } from 'lucide-react';
-import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus } from 'lucide-react';
+import { auth, db } from '../lib/firebase';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { FolioGrid } from './FolioGrid';
 import { Button } from './ui/Button';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export const PublicProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -14,6 +15,16 @@ export const PublicProfile = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [publicFolios, setPublicFolios] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const fetchPublicProfile = async () => {
@@ -22,24 +33,30 @@ export const PublicProfile = () => {
       setError(null);
 
       try {
-        // 1. Find user by username
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('username', '==', username));
-        const querySnapshot = await getDocs(q);
+        // 1. Find user by username in public_profiles
+        const profileRef = doc(db, 'public_profiles', username);
+        const profileSnapshot = await getDoc(profileRef);
+        
+        let userData: any = null;
+        let userId: string = '';
 
-        if (querySnapshot.empty) {
-          setError('User not found');
-          setLoading(false);
-          return;
-        }
-
-        const userData = querySnapshot.docs[0].data();
-        const userId = querySnapshot.docs[0].id;
-
-        if (userData.profilePrivacy === 'private') {
-          setError('This profile is private');
-          setLoading(false);
-          return;
+        if (profileSnapshot.exists()) {
+          userData = profileSnapshot.data();
+          userId = userData.uid;
+        } else {
+          // Fallback: Check users collection for legacy users
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('username', '==', username), where('profilePrivacy', '==', 'public'));
+          const querySnapshot = await getDocs(q);
+          
+          if (querySnapshot.empty) {
+            setError('User not found or profile is private');
+            setLoading(false);
+            return;
+          }
+          
+          userData = querySnapshot.docs[0].data();
+          userId = querySnapshot.docs[0].id;
         }
 
         setUserProfile({ id: userId, ...userData });
@@ -60,6 +77,14 @@ export const PublicProfile = () => {
         }));
 
         setPublicFolios(folios);
+
+        // 3. Check if following
+        if (auth.currentUser) {
+          const followId = `${auth.currentUser.uid}_${userId}`;
+          const followRef = doc(db, 'follows', followId);
+          const followSnap = await getDoc(followRef);
+          setIsFollowing(followSnap.exists());
+        }
       } catch (err) {
         console.error('Error fetching public profile:', err);
         setError('An error occurred while loading the profile');
@@ -69,7 +94,32 @@ export const PublicProfile = () => {
     };
 
     fetchPublicProfile();
-  }, [username]);
+  }, [username, currentUser]);
+
+  const handleFollow = async () => {
+    if (!currentUser || !userProfile) return;
+    setFollowLoading(true);
+    const followId = `${currentUser.uid}_${userProfile.id}`;
+    const followRef = doc(db, 'follows', followId);
+
+    try {
+      if (isFollowing) {
+        await deleteDoc(followRef);
+        setIsFollowing(false);
+      } else {
+        await setDoc(followRef, {
+          followerId: currentUser.uid,
+          followingId: userProfile.id,
+          createdAt: serverTimestamp()
+        });
+        setIsFollowing(true);
+      }
+    } catch (err) {
+      console.error('Error toggling follow:', err);
+    } finally {
+      setFollowLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -95,8 +145,40 @@ export const PublicProfile = () => {
 
   return (
     <div className="min-h-screen bg-canvas">
+      {/* Navigation */}
+      <div className="max-w-7xl mx-auto px-6 pt-8 flex items-center justify-between">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => navigate('/explore')}
+          className="gap-2 text-charcoal/40 hover:text-charcoal transition-colors group"
+        >
+          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+          Back to Explore
+        </Button>
+
+        {currentUser && userProfile && currentUser.uid !== userProfile.id && (
+          <Button
+            variant={isFollowing ? "outline" : "primary"}
+            size="sm"
+            onClick={handleFollow}
+            disabled={followLoading}
+            className="gap-2"
+          >
+            {followLoading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : isFollowing ? (
+              <UserMinus size={16} />
+            ) : (
+              <UserPlus size={16} />
+            )}
+            {isFollowing ? 'Following' : 'Follow Curator'}
+          </Button>
+        )}
+      </div>
+
       {/* Profile Header */}
-      <div className="bg-white border-b border-charcoal/5">
+      <div className="bg-white border-b border-charcoal/5 mt-8">
         <div className="max-w-7xl mx-auto px-6 py-16">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-10">
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-canvas shadow-xl bg-canvas shrink-0">

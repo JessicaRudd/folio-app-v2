@@ -166,7 +166,7 @@ function CreatorDashboard() {
               className="space-y-12"
             >
               <header className="px-6 text-center space-y-4">
-                <h2 className="text-5xl md:text-7xl">The Folio</h2>
+                <h2 className="text-5xl md:text-7xl">Folio</h2>
                 <p className="text-charcoal/60 max-w-xl mx-auto italic">
                   A curated collection of digital postcards. Private memories, shared with intention.
                 </p>

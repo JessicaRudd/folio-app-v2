@@ -18,6 +18,31 @@
       },
       "required": ["uid", "email"]
     },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Publicly visible user profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "bio": { "type": "string" },
+        "username": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "A follow relationship between two users",
+      "type": "object",
+      "properties": {
+        "followerId": { "type": "string" },
+        "followingId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["followerId", "followingId"]
+    },
     "Folio": {
       "title": "Folio",
       "description": "A collection of postcards",
@@ -63,6 +88,14 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles"
+    },
+    "/public_profiles/{username}": {
+      "schema": "PublicProfile",
+      "description": "Public user profiles indexed by username"
+    },
+    "/follows/{followId}": {
+      "schema": "Follow",
+      "description": "User follow relationships"
     },
     "/folios/{folioId}": {
       "schema": "Folio",

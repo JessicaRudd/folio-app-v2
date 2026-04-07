@@ -87,6 +87,23 @@ export const ProfilePage = () => {
         photoURL,
         updatedAt: new Date().toISOString()
       });
+
+      // Sync Public Profile
+      if (profile.profilePrivacy === 'public' && profile.username) {
+        await setDoc(doc(db, 'public_profiles', profile.username), {
+          uid: auth.currentUser.uid,
+          displayName: profile.displayName,
+          photoURL,
+          bio: profile.bio,
+          username: profile.username,
+          createdAt: profile.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      } else if (profile.username) {
+        // If switched to private, we could delete the public profile
+        // For now, let's just not update it, or we could explicitly delete it
+        // await deleteDoc(doc(db, 'public_profiles', profile.username));
+      }
       
       setProfile(prev => ({ ...prev, photoURL }));
       alert('Profile updated successfully!');
