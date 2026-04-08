@@ -25,9 +25,11 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
+        with:
+          install_components: 'beta'
 
       - name: Configure Docker
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
       - name: Build and Push Web Image
         run: |
@@ -41,4 +43,5 @@ jobs:
           gcloud beta run deploy ${{ env.SERVICE_NAME }} \
             --compose=docker-compose.yaml \
             --region=${{ env.REGION }} \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            --quiet
