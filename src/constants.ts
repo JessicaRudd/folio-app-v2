@@ -11,4 +11,4 @@ export const APP_LIMITS = {
   }
 };
 
-export const SUPPORT_URL = "https://buymeacoffee.com/folioapp"; // Placeholder
+export const SUPPORT_URL = "https://buymeacoffee.com/h9aq9muuYz";

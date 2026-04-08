@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Zap, Crown, ArrowRight } from 'lucide-react';
+import { X, Zap, Crown, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { Button } from './ui/Button';
+import { db, auth } from '../lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { cn } from '../lib/utils';
 
 interface LimitReachedModalProps {
   type: 'folios' | 'postcards' | 'photos';
@@ -9,6 +12,32 @@ interface LimitReachedModalProps {
 }
 
 export const LimitReachedModal = ({ type, onClose }: LimitReachedModalProps) => {
+  const [loading, setLoading] = useState(false);
+  const [joined, setJoined] = useState(false);
+
+  const handleNotify = async () => {
+    if (!auth.currentUser?.email) {
+      alert('Please log in to join the waitlist.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await setDoc(doc(db, 'waitlist', auth.currentUser.email), {
+        email: auth.currentUser.email,
+        userId: auth.currentUser.uid,
+        createdAt: serverTimestamp(),
+        source: `limit_reached_${type}`
+      });
+      setJoined(true);
+    } catch (error) {
+      console.error('Error joining waitlist:', error);
+      alert('Failed to join waitlist. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const limitInfo = {
     folios: {
       title: 'Folio Limit Reached',
@@ -82,8 +111,22 @@ export const LimitReachedModal = ({ type, onClose }: LimitReachedModalProps) => 
           <Button variant="primary" onClick={onClose} className="w-full">
             Got it
           </Button>
-          <Button variant="ghost" className="w-full text-xs uppercase tracking-widest font-bold gap-2">
-            Notify me when Premium launches <ArrowRight size={14} />
+          <Button 
+            variant="ghost" 
+            onClick={handleNotify}
+            disabled={loading || joined}
+            className={cn(
+              "w-full text-xs uppercase tracking-widest font-bold gap-2",
+              joined && "text-sage"
+            )}
+          >
+            {loading ? (
+              <Loader2 className="animate-spin" size={14} />
+            ) : joined ? (
+              <>You're on the list! <Check size={14} /></>
+            ) : (
+              <>Notify me when Premium launches <ArrowRight size={14} /></>
+            )}
           </Button>
         </div>
       </motion.div>

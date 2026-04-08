@@ -265,12 +265,14 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
     const isAdmin = userStats?.role === 'admin';
     const isPremium = userStats?.isPremium;
     if (!isAdmin && !isPremium) {
-      if (isCreatingNewCollection && (userStats?.total_collection_count || 0) >= 10) {
+      const currentCollections = userStats?.total_collection_count || userStats?.total_folio_count || 0;
+      if (isCreatingNewCollection && currentCollections >= 10) {
         if (onLimitReached) onLimitReached('folios');
         else alert('Free accounts are limited to 10 collections.');
         return;
       }
-      if ((userStats?.total_postcard_count || 0) >= 100) {
+      const currentPostcards = userStats?.total_postcard_count || 0;
+      if (currentPostcards >= 100) {
         if (onLimitReached) onLimitReached('postcards');
         else alert('Free accounts are limited to 100 postcards.');
         return;
@@ -529,7 +531,15 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Collection</label>
                     <button 
-                      onClick={() => setIsCreatingNewCollection(!isCreatingNewCollection)}
+                      onClick={() => {
+                        if (!isCreatingNewCollection && !userStats?.isPremium && userStats?.role !== 'admin') {
+                          if ((userStats?.total_collection_count || 0) >= 10) {
+                            if (onLimitReached) onLimitReached('folios');
+                            return;
+                          }
+                        }
+                        setIsCreatingNewCollection(!isCreatingNewCollection);
+                      }}
                       className="text-xs text-sage font-bold uppercase tracking-widest hover:underline"
                     >
                       {isCreatingNewCollection ? 'Select Existing' : '+ New Collection'}

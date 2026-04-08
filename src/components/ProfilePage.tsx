@@ -402,8 +402,105 @@ export const ProfilePage = () => {
                 <h3 className="text-xl font-serif">Admin Panel</h3>
               </div>
               
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-charcoal/5 space-y-6">
-                <div className="space-y-2">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-charcoal/5 space-y-8">
+                {/* Debug Limits */}
+                <div className="space-y-4">
+                  <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Debug Limits (Test Ribbon/Modal)</label>
+                  <div className="flex flex-wrap gap-3">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={async () => {
+                        if (!auth.currentUser) return;
+                        await updateDoc(doc(db, 'users', auth.currentUser.uid), { total_postcard_count: 95 });
+                        alert('Postcard count set to 95. Check the dashboard for the warning ribbon.');
+                      }}
+                    >
+                      Simulate 95 Postcards
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={async () => {
+                        if (!auth.currentUser) return;
+                        await updateDoc(doc(db, 'users', auth.currentUser.uid), { total_postcard_count: 100 });
+                        alert('Postcard count set to 100. Check the dashboard for the limit ribbon and try creating a postcard.');
+                      }}
+                    >
+                      Simulate 100 Postcards
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={async () => {
+                        if (!auth.currentUser) return;
+                        await updateDoc(doc(db, 'users', auth.currentUser.uid), { total_collection_count: 10 });
+                        alert('Collection count set to 10. Check the dashboard for the limit ribbon.');
+                      }}
+                    >
+                      Simulate 10 Collections
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-red-500"
+                      onClick={async () => {
+                        if (!auth.currentUser) return;
+                        // Recalculate real counts
+                        const { collection, query, where, getDocs } = await import('firebase/firestore');
+                        const pSnap = await getDocs(query(collection(db, 'postcards'), where('creatorId', '==', auth.currentUser.uid)));
+                        const cSnap = await getDocs(query(collection(db, 'collections'), where('creatorId', '==', auth.currentUser.uid)));
+                        await updateDoc(doc(db, 'users', auth.currentUser.uid), { 
+                          total_postcard_count: pSnap.size,
+                          total_collection_count: cSnap.size
+                        });
+                        alert('Counts reset to actual values.');
+                      }}
+                    >
+                      Reset Counts
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-red-400"
+                      onClick={async () => {
+                        if (!auth.currentUser) return;
+                        await updateDoc(doc(db, 'users', auth.currentUser.uid), { 
+                          total_postcard_count: 0,
+                          total_collection_count: 0
+                        });
+                        alert('Counts forced to 0 for testing.');
+                      }}
+                    >
+                      Clear All (Debug)
+                    </Button>
+                  </div>
+                  <div className="pt-2">
+                    <p className="text-[10px] text-charcoal/40 italic">
+                      Note: As an admin, you can still create content even at the limit, but the ribbon will show for testing. 
+                      To see the "Limit Reached" popup modal, use the button below:
+                    </p>
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={() => {
+                        // We need a way to trigger the modal in App.tsx. 
+                        // Since we can't easily reach App state from here without a global store, 
+                        // I'll just add a small trick: setting a special flag in localStorage 
+                        // that App.tsx can listen to, or just tell the user to use the counts.
+                        // Actually, I'll just add a "Test Modal" button in App.tsx for admins.
+                        alert('To test the "Limit Reached" modal, I have added a "Test Modal" button to your dashboard (only visible to you).');
+                        localStorage.setItem('test_limit_modal', 'true');
+                        window.location.href = '/';
+                      }}
+                    >
+                      Trigger Test Modal on Dashboard
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-4 border-t border-charcoal/5">
                   <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Manage User Roles</label>
                   <div className="flex gap-2">
                     <input

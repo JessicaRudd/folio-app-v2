@@ -141,7 +141,7 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
           profilePrivacy: 'private',
           follower_count: 0,
           following_count: 0,
-          total_folio_count: 0,
+          total_collection_count: 0,
           total_postcard_count: 0,
           createdAt: new Date().toISOString()
         });
@@ -191,7 +191,7 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
             profilePrivacy: 'private',
             follower_count: 0,
             following_count: 0,
-            total_folio_count: 0,
+            total_collection_count: 0,
             total_postcard_count: 0,
             createdAt: new Date().toISOString()
           });

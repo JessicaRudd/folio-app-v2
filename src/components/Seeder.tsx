@@ -39,7 +39,7 @@ export const Seeder = () => {
         photoURL: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
         role: 'creator',
         isPremium: false,
-        total_folio_count: 2,
+        total_collection_count: 2,
         total_postcard_count: 7,
         follower_count: 450,
         following_count: 120,

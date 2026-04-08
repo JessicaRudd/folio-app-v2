@@ -15,7 +15,7 @@
         "username": { "type": "string" },
         "profilePrivacy": { "type": "string", "enum": ["private", "public"] },
         "total_storage_used": { "type": "number" },
-        "total_folio_count": { "type": "number" },
+        "total_collection_count": { "type": "number" },
         "total_postcard_count": { "type": "number" },
         "monthly_postcard_count": { "type": "number" },
         "follower_count": { "type": "number" },
@@ -178,6 +178,18 @@
         "folioToken": { "type": "string" }
       },
       "required": ["id", "collectionId", "creatorId", "mediaUrls", "secureToken"]
+    },
+    "Waitlist": {
+      "title": "Waitlist",
+      "description": "Users waiting for premium features",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "source": { "type": "string" }
+      },
+      "required": ["email", "createdAt"]
     }
   },
   "firestore": {
@@ -220,6 +232,10 @@
     "/shares/{shareId}": {
       "schema": "Share",
       "description": "Access keys and sharing permissions"
+    },
+    "/waitlist/{email}": {
+      "schema": "Waitlist",
+      "description": "Premium waitlist entries"
     }
   }
 }

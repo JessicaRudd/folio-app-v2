@@ -15,6 +15,8 @@ import { PublicCollectionView } from './components/PublicCollectionView';
 import { CollectionView } from './components/CollectionView';
 import { ShareModal } from './components/ShareModal';
 import { FolioShareModal } from './components/FolioShareModal';
+import { LimitReachedModal } from './components/LimitReachedModal';
+import { AlertRibbon } from './components/AlertRibbon';
 import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Share2, Settings } from 'lucide-react';
@@ -44,22 +46,67 @@ function CreatorDashboard() {
   const [isSharingCollection, setIsSharingCollection] = useState(false);
   const [isSharingFullFolio, setIsSharingFullFolio] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
+  const [limitReachedType, setLimitReachedType] = useState<'folios' | 'postcards' | 'photos' | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [onboardingStep, setOnboardingStep] = useState<'welcome' | 'auth-email'>('welcome');
   const [realPostcards, setRealPostcards] = useState<any[]>([]);
   const [realCollections, setRealCollections] = useState<any[]>([]);
   const [looseStats, setLooseStats] = useState({ postcards: 0, photos: 0 });
+  const [dismissedAlert, setDismissedAlert] = useState<string | null>(null);
 
+  // Fetch User Profile and Stats
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    let userUnsubscribe: (() => void) | null = null;
+
+    const authUnsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      
+      // Clean up previous user listener if it exists
+      if (userUnsubscribe) {
+        userUnsubscribe();
+        userUnsubscribe = null;
+      }
+
       if (user) {
-        getDoc(doc(db, 'users', user.uid)).then(snap => {
-          if (snap.exists()) setUserProfile({ uid: user.uid, ...snap.data() });
+        userUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setUserProfile({ uid: user.uid, ...data });
+            
+            // Check for limits and show ribbon
+            const postcards = data.total_postcard_count || 0;
+            const collections = data.total_collection_count || data.total_folio_count || 0;
+            
+            let newMessage: string | null = null;
+            if (postcards >= 100) {
+              newMessage = "You've reached the 100 postcard limit for beta users.";
+            } else if (collections >= 10) {
+              newMessage = "You've reached the 10 collection limit for beta users.";
+            } else if (postcards >= 90) {
+              newMessage = `You're approaching your limit (${postcards}/100 postcards used).`;
+            } else if (collections >= 9) {
+              newMessage = `You're approaching your limit (${collections}/10 collections used).`;
+            }
+
+            // Only show if it's a new message or hasn't been dismissed
+            if (newMessage !== dismissedAlert) {
+              setAlertMessage(newMessage);
+              if (!newMessage) setDismissedAlert(null);
+            }
+          }
         });
+      } else {
+        setUserProfile(null);
+        setAlertMessage(null);
+        setDismissedAlert(null);
       }
     });
-    return () => unsubscribe();
-  }, []);
+
+    return () => {
+      authUnsubscribe();
+      if (userUnsubscribe) userUnsubscribe();
+    };
+  }, [dismissedAlert]);
 
   // Fetch Loose Leaves Stats
   useEffect(() => {
@@ -184,6 +231,16 @@ function CreatorDashboard() {
 
   const handleLogout = () => signOut(auth);
 
+  const handleCreatePostcard = () => {
+    if (!userProfile?.isPremium && userProfile?.role !== 'admin') {
+      if ((userProfile?.total_postcard_count || 0) >= 100) {
+        setLimitReachedType('postcards');
+        return;
+      }
+    }
+    setIsCreating(true);
+  };
+
   const handleShareCollection = (collection: any) => {
     const baseUrl = window.location.origin;
     let shareUrl = '';
@@ -203,6 +260,14 @@ function CreatorDashboard() {
 
   const selectedCollection = realCollections.find(f => f.id === selectedCollectionId);
 
+  useEffect(() => {
+    const testModal = localStorage.getItem('test_limit_modal');
+    if (testModal === 'true') {
+      setLimitReachedType('postcards');
+      localStorage.removeItem('test_limit_modal');
+    }
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar 
@@ -212,8 +277,22 @@ function CreatorDashboard() {
           setIsOnboarding(true);
         }} 
         onLogout={handleLogout} 
-        onCreate={() => setIsCreating(true)} 
+        onCreate={handleCreatePostcard} 
       />
+
+      <AnimatePresence>
+        {alertMessage && (
+          <AlertRibbon 
+            message={alertMessage} 
+            onClose={() => {
+              setDismissedAlert(alertMessage);
+              setAlertMessage(null);
+            }}
+            actionLabel="View Plans"
+            onAction={() => setLimitReachedType('postcards')}
+          />
+        )}
+      </AnimatePresence>
 
       <main className="flex-1 max-w-7xl mx-auto w-full py-12">
         <AnimatePresence mode="wait">
@@ -304,7 +383,7 @@ function CreatorDashboard() {
                       </Button>
                     )}
                     {(user.uid === selectedCollection.creatorId || (selectedCollection.curators && selectedCollection.curators[user.uid] === 'editor')) && (
-                      <Button variant="secondary" size="sm" className="gap-2" onClick={() => setIsCreating(true)}>
+                      <Button variant="secondary" size="sm" className="gap-2" onClick={handleCreatePostcard}>
                         <Plus size={16} />
                         Add to {selectedCollection?.title}
                       </Button>
@@ -325,7 +404,7 @@ function CreatorDashboard() {
                   <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-charcoal/10">
                     <p className="text-charcoal/40 italic">No postcards in this collection yet.</p>
                     {user && (
-                      <Button variant="ghost" className="mt-4" onClick={() => setIsCreating(true)}>
+                      <Button variant="ghost" className="mt-4" onClick={handleCreatePostcard}>
                         Create your first postcard
                       </Button>
                     )}
@@ -371,6 +450,16 @@ function CreatorDashboard() {
           <CreatePostcard 
             onClose={() => setIsCreating(false)}
             onSuccess={() => setIsCreating(false)}
+            onLimitReached={(type) => setLimitReachedType(type)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {limitReachedType && (
+          <LimitReachedModal 
+            type={limitReachedType} 
+            onClose={() => setLimitReachedType(null)} 
           />
         )}
       </AnimatePresence>

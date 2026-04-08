@@ -37,11 +37,13 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
     function isValidUser(data) {
-      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'photoUrl', 'role', 'isPremium', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'total_folio_count', 'total_postcard_count', 'monthly_postcard_count', 'follower_count', 'following_count', 'createdAt', 'updatedAt', 'lastLogin', 'providerId', 'emailVerified', 'phoneNumber', 'disabled', 'metadata', 'customClaims'];
+      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'photoUrl', 'role', 'isPremium', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'total_folio_count', 'total_collection_count', 'total_postcard_count', 'monthly_postcard_count', 'follower_count', 'following_count', 'createdAt', 'updatedAt', 'lastLogin', 'providerId', 'emailVerified', 'phoneNumber', 'disabled', 'metadata', 'customClaims'];
       return data.keys().hasOnly(allowedFields) &&
              (!('uid' in data) || (data.uid is string && data.uid.size() < 100)) &&
              (!('email' in data) || (data.email is string && isValidEmail(data.email))) &&
              (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string)) &&
              (!('bio' in data) || (data.bio is string && data.bio.size() < 1000)) &&
              (!('username' in data) || (data.username is string && data.username.size() < 50)) &&
              (!('profilePrivacy' in data) || data.profilePrivacy in ['private', 'public']) &&
@@ -50,12 +52,20 @@ service cloud.firestore {
              (!('follower_count' in data) || data.follower_count is number) &&
              (!('following_count' in data) || data.following_count is number) &&
              (!('total_folio_count' in data) || data.total_folio_count is number) &&
+             (!('total_collection_count' in data) || data.total_collection_count is number) &&
              (!('total_postcard_count' in data) || data.total_postcard_count is number);
     }
 
     function isValidPublicProfile(data) {
       let allowedFields = ['uid', 'displayName', 'photoURL', 'photoUrl', 'bio', 'username', 'profilePrivacy', 'follower_count', 'following_count', 'createdAt', 'updatedAt'];
-      return data.keys().hasOnly(allowedFields);
+      return data.keys().hasOnly(allowedFields) &&
+             (!('uid' in data) || (data.uid is string)) &&
+             (!('displayName' in data) || (data.displayName is string)) &&
+             (!('photoURL' in data) || (data.photoURL is string)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string)) &&
+             (!('bio' in data) || (data.bio is string)) &&
+             (!('username' in data) || (data.username is string)) &&
+             (!('profilePrivacy' in data) || (data.profilePrivacy is string));
     }
 
     function isValidCollection(data) {
@@ -110,7 +120,7 @@ service cloud.firestore {
       return (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
              (!('collectionId' in data) || (data.collectionId is string && data.collectionId.size() < 100)) &&
              (!('creatorId' in data) || (data.creatorId is string && data.creatorId.size() < 100)) &&
-             (!('mediaUrls' in data) || (data.mediaUrls is list && data.mediaUrls.size() > 0 && data.mediaUrls.size() <= 10)) &&
+             (!('mediaUrls' in data) || (data.mediaUrls is list && data.mediaUrls.size() > 0 && data.mediaUrls.size() <= 5)) &&
              (!('secureToken' in data) || (data.secureToken is string && data.secureToken.size() < 200)) &&
              (!('caption' in data) || (data.caption is string && data.caption.size() < 5000)) &&
              (!('location' in data) || (data.location is string && data.location.size() < 500)) &&
@@ -133,17 +143,18 @@ service cloud.firestore {
     }
 
     function isCuratorOfCollection(collectionId) {
+      let collPath = /databases/$(database)/documents/collections/$(collectionId);
       return isAuthenticated() && 
              collectionId != 'loose-leaves' &&
-             exists(/databases/$(database)/documents/collections/$(collectionId)) &&
-             (get(/databases/$(database)/documents/collections/$(collectionId)).data.creatorId == request.auth.uid || 
-              request.auth.uid in get(/databases/$(database)/documents/collections/$(collectionId)).data.get('curators', {}));
+             exists(collPath) &&
+             (get(collPath).data.get('creatorId', '') == request.auth.uid || 
+              request.auth.uid in get(collPath).data.get('curators', {}));
     }
 
     function curatorRole(collectionId) {
       let collectionPath = /databases/$(database)/documents/collections/$(collectionId);
       return (collectionId != 'loose-leaves' && exists(collectionPath)) ? 
-        ((get(collectionPath).data.creatorId == request.auth.uid) ? 'owner' : get(collectionPath).data.get('curators', {}).get(request.auth.uid, 'none')) : 
+        ((get(collectionPath).data.get('creatorId', '') == request.auth.uid) ? 'owner' : get(collectionPath).data.get('curators', {}).get(request.auth.uid, 'none')) : 
         'none';
     }
 
@@ -248,7 +259,7 @@ service cloud.firestore {
                    (resource.data.get('secureToken', '') != '');
       
       allow create: if isAuthenticated() && isValidCollection(request.resource.data) && (request.resource.data.creatorId == request.auth.uid || isAdmin()) &&
-                    (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.total_folio_count < 10);
+                    (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('total_collection_count', 0) < 10);
       allow update: if isAuthenticated() && (role() == 'owner' || isAdmin() || role() == 'editor');
       allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
@@ -273,7 +284,8 @@ service cloud.firestore {
         return isInvitedToCollection(resource.data.collectionId);
       }
     function role() {
-      return curatorRole(request.resource.data.collectionId);
+      let collId = (request.method == 'create') ? request.resource.data.collectionId : resource.data.collectionId;
+      return curatorRole(collId);
     }
 
     // Allow read if the user is the creator, curator, invited, or in the visibility list
@@ -293,44 +305,49 @@ service cloud.firestore {
     allow create: if isAuthenticated() && (isAdmin() || (isValidPostcard(request.resource.data) && 
                   (request.resource.data.creatorId == request.auth.uid) &&
                   (request.resource.data.collectionId == 'loose-leaves' || role() == 'owner' || role() == 'editor') &&
-                  get(/databases/$(database)/documents/users/$(request.auth.uid)).data.total_postcard_count < 100));
+                  get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('total_postcard_count', 0) < 100));
       allow update: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || role() == 'owner' || isAdmin());
       allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || role() == 'owner' || isAdmin());
     }
 
     match /shares/{shareId} {
+      function canManageShare(collectionId) {
+        let collPath = /databases/$(database)/documents/collections/$(collectionId);
+        return exists(collPath) && (
+          get(collPath).data.get('creatorId', '') == request.auth.uid ||
+          request.auth.uid in get(collPath).data.get('curators', {})
+        );
+      }
+
       allow get: if isAuthenticated() || 
-        (resource.data.status == 'active' && 
-         (resource.data.expiresAt == null || timestamp(resource.data.expiresAt) > request.time));
+        (resource.data.get('status', '') == 'active' && 
+         (resource.data.get('expiresAt', null) == null || timestamp(resource.data.expiresAt) > request.time));
       
       allow list: if isAuthenticated() && (
         (resource.data.get('userId', '') == request.auth.uid) ||
-        (resource.data.get('type', '') != 'folio' && 
-         (get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.creatorId == request.auth.uid ||
-          request.auth.uid in get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.get('curators', {}))) ||
+        (resource.data.get('type', '') != 'folio' && canManageShare(resource.data.get('collectionId', ''))) ||
         isAdmin()
       );
       allow create: if isAuthenticated() && isValidShare(request.resource.data) && (
-        (request.resource.data.type == 'folio' && request.resource.data.userId == request.auth.uid) ||
-        (request.resource.data.type != 'folio' && 
-         (get(/databases/$(database)/documents/collections/$(request.resource.data.collectionId)).data.creatorId == request.auth.uid ||
-          request.auth.uid in get(/databases/$(database)/documents/collections/$(request.resource.data.collectionId)).data.get('curators', {}))) ||
+        (request.resource.data.get('type', '') == 'folio' && request.resource.data.get('userId', '') == request.auth.uid) ||
+        (request.resource.data.get('type', '') != 'folio' && canManageShare(request.resource.data.get('collectionId', ''))) ||
         isAdmin()
       );
       allow update: if (isAuthenticated() && (
         (resource.data.get('userId', '') == request.auth.uid) ||
-        (resource.data.get('type', '') != 'folio' && 
-         (get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.creatorId == request.auth.uid ||
-          request.auth.uid in get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.get('curators', {}))) ||
+        (resource.data.get('type', '') != 'folio' && canManageShare(resource.data.get('collectionId', ''))) ||
         isAdmin()
       )) || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accessedBy']));
       allow delete: if isAuthenticated() && (
         (resource.data.get('userId', '') == request.auth.uid) ||
-        (resource.data.get('type', '') != 'folio' && 
-         (get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.creatorId == request.auth.uid ||
-          request.auth.uid in get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.get('curators', {}))) ||
+        (resource.data.get('type', '') != 'folio' && canManageShare(resource.data.get('collectionId', ''))) ||
         isAdmin()
       );
+    }
+
+    match /waitlist/{email} {
+      allow create: if true; // Anyone can join waitlist
+      allow read, update, delete: if isAdmin();
     }
   }
 }
