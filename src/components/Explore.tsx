@@ -12,6 +12,7 @@ import { socialService } from '../services/socialService';
 import { Seeder } from './Seeder';
 import { Navbar } from './Navbar';
 import { Onboarding } from './Onboarding';
+import { Footer } from './Footer';
 import { auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { AnimatePresence } from 'motion/react';
@@ -458,19 +459,7 @@ export const Explore = () => {
         )}
       </main>
 
-      <footer className="max-w-7xl mx-auto px-6 py-12 border-t border-charcoal/5 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex flex-col items-center md:items-start gap-2">
-          <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/20">
-            &copy; 2026 Folio &mdash; The Discovery Engine
-          </div>
-          <Seeder />
-        </div>
-        <div className="flex gap-8 text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40">
-          <Link to="/" className="hover:text-charcoal transition-colors">Home</Link>
-          <Link to="/explore" className="hover:text-charcoal transition-colors">Explore</Link>
-          <Link to="/map" className="hover:text-charcoal transition-colors">Map</Link>
-        </div>
-      </footer>
+      <Footer user={user} message="&copy; 2026 Folio &mdash; The Discovery Engine" />
     </div>
   );
 };

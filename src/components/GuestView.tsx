@@ -4,8 +4,9 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc, arrayUnion }
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Postcard } from './Postcard';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lock, Globe, ArrowLeft, Mail, ShieldCheck, Loader2, CheckCircle2, Share2, Check } from 'lucide-react';
+import { Lock, Globe, ArrowLeft, Mail, ShieldCheck, Loader2, CheckCircle2, Share2, Check, MessageSquare } from 'lucide-react';
 import { Button } from './ui/Button';
+import { Footer } from './Footer';
 
 export const GuestView = () => {
   const { collectionId, secureToken } = useParams<{ collectionId: string; secureToken: string }>();
@@ -498,11 +499,7 @@ export const GuestView = () => {
           ))}
         </div>
 
-        <footer className="pt-20 text-center">
-          <div className="text-charcoal/30 text-xs uppercase tracking-widest font-bold">
-            Shared via Folio &mdash; Privacy First
-          </div>
-        </footer>
+        <Footer />
       </motion.div>
     </div>
   );

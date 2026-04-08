@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { User, Mail, Globe, Lock, Save, Loader2, Camera, ChevronRight, ArrowLeft } from 'lucide-react';
+import { User, Mail, Globe, Lock, Save, Loader2, Camera, ChevronRight, ArrowLeft, MessageSquare } from 'lucide-react';
 import { Button } from './ui/Button';
 import { auth, db, storage } from '../lib/firebase';
+import { Footer } from './Footer';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { cn } from '../lib/utils';
@@ -552,6 +553,8 @@ export const ProfilePage = () => {
           )}
         </main>
       </div>
+      
+      <Footer user={auth.currentUser} />
     </div>
   );
 };

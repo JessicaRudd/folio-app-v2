@@ -8,6 +8,7 @@ import { CollectionGrid } from './CollectionGrid';
 import { Button } from './ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
 import { socialService } from '../services/socialService';
+import { Footer } from './Footer';
 
 export const PublicProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -281,11 +282,7 @@ export const PublicProfile = () => {
         )}
       </main>
 
-      <footer className="py-12 border-t border-charcoal/5 text-center">
-        <div className="text-charcoal/30 text-xs uppercase tracking-widest font-bold">
-          Curated by {userProfile.displayName} &mdash; Powered by Folio
-        </div>
-      </footer>
+      <Footer user={currentUser} message={`Curated by ${userProfile.displayName} — Powered by Folio`} />
     </div>
   );
 };

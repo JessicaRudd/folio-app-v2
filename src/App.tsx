@@ -17,6 +17,8 @@ import { ShareModal } from './components/ShareModal';
 import { FolioShareModal } from './components/FolioShareModal';
 import { LimitReachedModal } from './components/LimitReachedModal';
 import { AlertRibbon } from './components/AlertRibbon';
+import { Footer } from './components/Footer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Share2, Settings } from 'lucide-react';
@@ -492,30 +494,28 @@ function CreatorDashboard() {
         )}
       </AnimatePresence>
 
-      <footer className="py-12 border-t border-charcoal/5 text-center">
-        <div className="text-charcoal/30 text-xs uppercase tracking-widest font-bold">
-          &copy; 2026 Folio &mdash; Privacy First Sharing
-        </div>
-      </footer>
+      <Footer user={user} />
     </div>
   );
 }
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<CreatorDashboard />} />
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/u/:username" element={<PublicProfile />} />
-        <Route path="/explore" element={<Explore />} />
-        <Route path="/map" element={<MapView />} />
-        <Route path="/v/:collectionId" element={<GuestView />} />
-        <Route path="/v/:collectionId/:secureToken" element={<GuestView />} />
-        <Route path="/s/:collectionId" element={<PublicCollectionView />} />
-        <Route path="/f/:username" element={<CollectionView />} />
-        <Route path="/f/:username/invite/:shareId" element={<CollectionView />} />
-      </Routes>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <Routes>
+          <Route path="/" element={<CreatorDashboard />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/u/:username" element={<PublicProfile />} />
+          <Route path="/explore" element={<Explore />} />
+          <Route path="/map" element={<MapView />} />
+          <Route path="/v/:collectionId" element={<GuestView />} />
+          <Route path="/v/:collectionId/:secureToken" element={<GuestView />} />
+          <Route path="/s/:collectionId" element={<PublicCollectionView />} />
+          <Route path="/f/:username" element={<CollectionView />} />
+          <Route path="/f/:username/invite/:shareId" element={<CollectionView />} />
+        </Routes>
+      </Router>
+    </ErrorBoundary>
   );
 }
