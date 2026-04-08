@@ -221,6 +221,15 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
       <Button variant="primary" onClick={handleNext} className="w-full py-6 text-lg group">
         Begin Your Journey <ChevronRight className="ml-2 group-hover:translate-x-1 transition-transform" />
       </Button>
+      <div className="text-center">
+        <button 
+          type="button" 
+          onClick={() => setStep('auth-email')}
+          className="text-xs text-charcoal/40 hover:text-sage font-bold uppercase tracking-widest transition-colors"
+        >
+          Already a creator? Sign In
+        </button>
+      </div>
     </div>
   );
 

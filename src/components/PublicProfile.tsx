@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus, Share2, Check } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
@@ -159,15 +159,24 @@ export const PublicProfile = () => {
     <div className="min-h-screen bg-canvas">
       {/* Navigation */}
       <div className="max-w-7xl mx-auto px-6 pt-8 flex items-center justify-between">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => navigate('/explore')}
-          className="gap-2 text-charcoal/40 hover:text-charcoal transition-colors group"
-        >
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          Back to Explore
-        </Button>
+        <div className="flex items-center gap-6">
+          <Link 
+            to="/"
+            className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
+          >
+            <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
+            Home
+          </Link>
+          <div className="w-px h-4 bg-charcoal/10" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/explore')}
+            className="gap-2 text-charcoal/40 hover:text-charcoal transition-colors group p-0 h-auto"
+          >
+            Explore
+          </Button>
+        </div>
 
         <div className="flex items-center gap-3">
           <Button

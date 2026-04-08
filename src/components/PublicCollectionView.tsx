@@ -148,6 +148,19 @@ export const PublicCollectionView = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Navigation */}
+      <div className="absolute top-0 left-0 right-0 z-50 px-6 py-8 flex items-center justify-between pointer-events-none">
+        <div className="pointer-events-auto">
+          <Link 
+            to="/"
+            className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/60 hover:text-white transition-colors flex items-center gap-2 group bg-black/20 backdrop-blur-md px-4 py-2 rounded-full"
+          >
+            <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
+            Home
+          </Link>
+        </div>
+      </div>
+
       {/* Premium Editorial Header */}
       <div className="relative h-[70vh] w-full overflow-hidden">
         <img 

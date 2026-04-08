@@ -44,6 +44,7 @@ function CreatorDashboard() {
   const [isSharingCollection, setIsSharingCollection] = useState(false);
   const [isSharingFullFolio, setIsSharingFullFolio] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<'welcome' | 'auth-email'>('welcome');
   const [realPostcards, setRealPostcards] = useState<any[]>([]);
   const [realCollections, setRealCollections] = useState<any[]>([]);
   const [looseStats, setLooseStats] = useState({ postcards: 0, photos: 0 });
@@ -206,7 +207,10 @@ function CreatorDashboard() {
     <div className="min-h-screen flex flex-col">
       <Navbar 
         user={user} 
-        onLogin={() => setIsOnboarding(true)} 
+        onLogin={(step = 'auth-email') => {
+          setOnboardingStep(step);
+          setIsOnboarding(true);
+        }} 
         onLogout={handleLogout} 
         onCreate={() => setIsCreating(true)} 
       />
@@ -260,7 +264,10 @@ function CreatorDashboard() {
               ) : (
                 <div className="text-center py-20">
                   <p className="text-charcoal/40 italic mb-8">Login to view your private collections.</p>
-                  <Button variant="primary" onClick={() => setIsOnboarding(true)}>Get Started</Button>
+                  <Button variant="primary" onClick={() => {
+                    setOnboardingStep('welcome');
+                    setIsOnboarding(true);
+                  }}>Get Started</Button>
                 </div>
               )}
             </motion.div>
@@ -354,6 +361,7 @@ function CreatorDashboard() {
           <Onboarding 
             onClose={() => setIsOnboarding(false)}
             onSuccess={() => setIsOnboarding(false)}
+            initialStep={onboardingStep}
           />
         )}
       </AnimatePresence>

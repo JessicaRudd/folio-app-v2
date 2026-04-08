@@ -64,6 +64,12 @@ export const Comments = ({ postcardId, creatorId, onClose }: CommentsProps) => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {!auth.currentUser && (
+          <div className="p-4 bg-sage/5 rounded-xl border border-sage/10 text-center space-y-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-sage">Registered Users Only</p>
+            <p className="text-sm text-charcoal/60">Please sign in to join the conversation and share your thoughts.</p>
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="animate-spin text-sage" size={24} />

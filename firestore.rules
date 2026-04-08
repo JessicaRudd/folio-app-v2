@@ -125,6 +125,13 @@ service cloud.firestore {
              (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
+    function isValidLike(data) {
+      let allowedFields = ['postcardId', 'userId', 'createdAt'];
+      return data.keys().hasOnly(allowedFields) &&
+             data.postcardId is string &&
+             data.userId is string;
+    }
+
     function isCuratorOfCollection(collectionId) {
       return isAuthenticated() && 
              collectionId != 'loose-leaves' &&
@@ -203,8 +210,10 @@ service cloud.firestore {
 
     match /likes/{likeId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isValidLike(request.resource.data) && 
+                      (isAuthenticated() ? request.auth.uid == request.resource.data.userId : request.resource.data.userId.matches("^guest_.*"));
+      allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid) || 
+                      (resource.data.userId.matches("^guest_.*"));
     }
 
     match /comments/{commentId} {

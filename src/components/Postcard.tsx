@@ -99,10 +99,6 @@ export const Postcard = ({
   }, [id]);
 
   const handleLike = async () => {
-    if (!auth.currentUser) {
-      alert('Please login to like postcards.');
-      return;
-    }
     try {
       const isLiked = await socialService.toggleLike(id, creatorId);
       setLiked(isLiked);

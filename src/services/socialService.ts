@@ -47,11 +47,20 @@ export interface Notification {
   createdAt: any;
 }
 
+// Helper to get a persistent guest ID for unauthenticated visitors
+const getGuestId = () => {
+  let id = localStorage.getItem('folio_guest_id');
+  if (!id) {
+    id = 'guest_' + Math.random().toString(36).substring(2, 11);
+    localStorage.setItem('folio_guest_id', id);
+  }
+  return id;
+};
+
 export const socialService = {
   // Likes
   async toggleLike(postcardId: string, creatorId: string) {
-    if (!auth.currentUser) return;
-    const userId = auth.currentUser.uid;
+    const userId = auth.currentUser?.uid || getGuestId();
     
     const q = query(
       collection(db, 'likes'),
@@ -59,32 +68,50 @@ export const socialService = {
       where('userId', '==', userId)
     );
     
-    const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      // Unlike
-      await deleteDoc(doc(db, 'likes', snapshot.docs[0].id));
-      return false;
-    } else {
-      // Like
-      await addDoc(collection(db, 'likes'), {
-        postcardId,
-        userId,
-        createdAt: serverTimestamp()
-      });
-      
-      // Notify creator
-      if (userId !== creatorId) {
-        await this.sendNotification({
-          userId: creatorId,
-          type: 'like',
-          fromUserId: userId,
-          fromUserName: auth.currentUser.displayName || 'Someone',
-          postcardId,
-          read: false,
-          createdAt: serverTimestamp()
-        });
+    try {
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        // Unlike
+        const likeId = snapshot.docs[0].id;
+        try {
+          await deleteDoc(doc(db, 'likes', likeId));
+        } catch (err) {
+          handleFirestoreError(err, OperationType.DELETE, `likes/${likeId}`);
+        }
+        return false;
+      } else {
+        // Like
+        try {
+          await addDoc(collection(db, 'likes'), {
+            postcardId,
+            userId,
+            createdAt: serverTimestamp()
+          });
+        } catch (err) {
+          handleFirestoreError(err, OperationType.CREATE, 'likes');
+        }
+        
+        // Notify creator (only if liked by a registered user)
+        if (auth.currentUser && userId !== creatorId) {
+          try {
+            await this.sendNotification({
+              userId: creatorId,
+              type: 'like',
+              fromUserId: userId,
+              fromUserName: auth.currentUser.displayName || 'Someone',
+              postcardId,
+              read: false,
+              createdAt: serverTimestamp()
+            });
+          } catch (err) {
+            console.warn('Failed to send like notification:', err);
+          }
+        }
+        return true;
       }
-      return true;
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'likes');
+      return false;
     }
   },
 
@@ -95,11 +122,11 @@ export const socialService = {
   },
 
   async hasLiked(postcardId: string) {
-    if (!auth.currentUser) return false;
+    const userId = auth.currentUser?.uid || getGuestId();
     const q = query(
       collection(db, 'likes'),
       where('postcardId', '==', postcardId),
-      where('userId', '==', auth.currentUser.uid)
+      where('userId', '==', userId)
     );
     const snapshot = await getDocs(q);
     return !snapshot.empty;

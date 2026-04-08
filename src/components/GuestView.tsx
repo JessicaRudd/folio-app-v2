@@ -434,6 +434,14 @@ export const GuestView = () => {
             {collectionData?.privacy === 'public' ? 'Public Collection' : 'Private Guest View'}
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 mb-4">
+            <Link 
+              to="/"
+              className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
+            >
+              <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
+              Home
+            </Link>
+            <div className="w-px h-4 bg-charcoal/10" />
             {collectionData?.privacy === 'public' && (
               <Button 
                 variant="outline" 
