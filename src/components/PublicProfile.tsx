@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus, Share2, Check } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
-import { FolioGrid } from './FolioGrid';
+import { CollectionGrid } from './CollectionGrid';
 import { Button } from './ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
 import { socialService } from '../services/socialService';
@@ -14,7 +14,7 @@ export const PublicProfile = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [publicFolios, setPublicFolios] = useState<any[]>([]);
+  const [publicCollections, setPublicCollections] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -31,9 +31,9 @@ export const PublicProfile = () => {
     copyToClipboard(window.location.href, 'profile');
   };
 
-  const handleShareCollection = (folio: any) => {
-    const url = `${window.location.origin}/s/${folio.id}`;
-    copyToClipboard(url, folio.id);
+  const handleShareCollection = (collectionData: any) => {
+    const url = `${window.location.origin}/s/${collectionData.id}`;
+    copyToClipboard(url, collectionData.id);
   };
 
   useEffect(() => {
@@ -77,22 +77,22 @@ export const PublicProfile = () => {
 
         setUserProfile({ id: userId, ...userData });
 
-        // 2. Fetch public folios for this user
-        const foliosRef = collection(db, 'folios');
-        const foliosQuery = query(
-          foliosRef, 
+        // 2. Fetch public collections for this user
+        const collectionsRef = collection(db, 'collections');
+        const collectionsQuery = query(
+          collectionsRef, 
           where('creatorId', '==', userId),
           where('visibility', '==', 'public')
         );
-        const foliosSnapshot = await getDocs(foliosQuery);
-        const folios = foliosSnapshot.docs.map(doc => ({
+        const collectionsSnapshot = await getDocs(collectionsQuery);
+        const collections = collectionsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          folioDate: doc.data().folioDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+          collectionDate: doc.data().collectionDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
           createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
         }));
 
-        setPublicFolios(folios);
+        setPublicCollections(collections);
 
         // 3. Check if following
         if (auth.currentUser) {
@@ -230,7 +230,7 @@ export const PublicProfile = () => {
               <div className="flex flex-wrap justify-center md:justify-start gap-6 pt-2">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
                   <Globe size={14} className="text-sage" />
-                  {publicFolios.length} Public Collections
+                  {publicCollections.length} Public Collections
                 </div>
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
                   <User size={14} className="text-sage" />
@@ -257,13 +257,13 @@ export const PublicProfile = () => {
           <div className="w-12 h-px bg-sage/20 mx-auto" />
         </div>
 
-        {publicFolios.length === 0 ? (
+        {publicCollections.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-charcoal/10">
             <p className="text-charcoal/40 italic">No public collections shared yet.</p>
           </div>
         ) : (
-          <FolioGrid 
-            folios={publicFolios} 
+          <CollectionGrid 
+            collections={publicCollections} 
             onSelect={(id) => {
               navigate(`/v/${id}/public`);
             }} 

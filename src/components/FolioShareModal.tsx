@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X, Copy, Check, Loader2, Users, Mail, ShieldCheck, Trash2, Lock, Globe } from 'lucide-react';
 import { Button } from './ui/Button';
+import { cn } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   doc, 
@@ -28,6 +29,7 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
   const [folioMetadata, setFolioMetadata] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [shares, setShares] = useState<any[]>([]);
+  const [expiration, setExpiration] = useState<'24h' | '7d' | '30d' | 'never'>('7d');
 
   const folioUrl = folioMetadata ? `${window.location.origin}/f/${user.username}?token=${folioMetadata.shareToken}` : '';
   const isProfilePublic = user.profilePrivacy === 'public';
@@ -93,13 +95,13 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
         createdAt: serverTimestamp()
       });
 
-      // 2. Propagate token to all user's collections (folios)
-      const foliosQuery = query(collection(db, 'folios'), where('creatorId', '==', user.uid));
-      const foliosSnap = await getDocs(foliosQuery);
+      // 2. Propagate token to all user's collections
+      const collectionsQuery = query(collection(db, 'collections'), where('creatorId', '==', user.uid));
+      const collectionsSnap = await getDocs(collectionsQuery);
       
       const batch = writeBatch(db);
       
-      foliosSnap.docs.forEach(f => {
+      collectionsSnap.docs.forEach(f => {
         batch.update(f.ref, { folioToken: token });
       });
 
@@ -126,11 +128,23 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
     if (!inviteEmail.trim()) return;
     setLoading(true);
     try {
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      
+      let expiresAt: Date | null = null;
+      if (expiration !== 'never') {
+        expiresAt = new Date();
+        if (expiration === '24h') expiresAt.setHours(expiresAt.getHours() + 24);
+        if (expiration === '7d') expiresAt.setDate(expiresAt.getDate() + 7);
+        if (expiration === '30d') expiresAt.setDate(expiresAt.getDate() + 30);
+      }
+
       await addDoc(collection(db, 'shares'), {
         userId: user.uid,
         username: user.username,
         type: 'folio',
         email: inviteEmail.trim().toLowerCase(),
+        token,
+        expiresAt: expiresAt ? expiresAt.toISOString() : null,
         status: 'active',
         createdAt: serverTimestamp(),
         accessedBy: []
@@ -177,7 +191,7 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
       >
         <div className="p-8 space-y-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-3xl font-serif">Share Folio</h2>
+            <h2 className="text-3xl font-serif">Share Collections</h2>
             <button onClick={onClose} className="p-2 hover:bg-canvas rounded-full transition-colors">
               <X size={24} />
             </button>
@@ -188,34 +202,54 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
               <div className="w-12 h-12 bg-sage/10 text-sage rounded-full flex items-center justify-center mx-auto">
                 <Users size={24} />
               </div>
-              <h3 className="font-serif text-xl">Private Folio Invite</h3>
+              <h3 className="font-serif text-xl">Private Collections Invite</h3>
               <p className="text-xs text-charcoal/60 italic">
-                Invite specific guests to view your entire folio via email verification.
+                Invite specific guests to view your entire collection set via email verification.
               </p>
             </div>
 
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30" size={18} />
-                <input 
-                  type="email"
-                  placeholder="guest@email.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-canvas rounded-xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all"
-                />
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30" size={18} />
+                  <input 
+                    type="email"
+                    placeholder="guest@email.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-canvas rounded-xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all"
+                  />
+                </div>
+                <Button 
+                  variant="primary" 
+                  onClick={createShare}
+                  disabled={loading || !inviteEmail}
+                >
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : 'Invite'}
+                </Button>
               </div>
-              <Button 
-                variant="primary" 
-                onClick={createShare}
-                disabled={loading || !inviteEmail}
-              >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : 'Invite'}
-              </Button>
+
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Expires in:</span>
+                <div className="flex gap-2 p-1 bg-canvas rounded-lg">
+                  {(['24h', '7d', '30d', 'never'] as const).map((exp) => (
+                    <button
+                      key={exp}
+                      onClick={() => setExpiration(exp)}
+                      className={cn(
+                        "px-2 py-1 text-[9px] font-bold uppercase tracking-widest rounded-md transition-all",
+                        expiration === exp ? "bg-white text-sage shadow-sm" : "text-charcoal/40 hover:text-charcoal"
+                      )}
+                    >
+                      {exp}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Folio Guest List</h4>
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Collections Guest List</h4>
               {shares.length === 0 ? (
                 <div className="text-center py-4 text-charcoal/20 italic text-xs">
                   No guests invited yet.
@@ -229,13 +263,13 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-bold truncate">{share.email}</div>
-                        <div className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">
-                          {share.accessedBy?.length || 0} Accesses
+                        <div className="text-[9px] text-charcoal/40 uppercase tracking-widest font-bold">
+                          {share.expiresAt ? `Expires: ${new Date(share.expiresAt).toLocaleDateString()}` : 'Never expires'}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/f/${user.username}/invite/${share.id}`)}>
+                      <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/f/${user.username}/invite/${share.id}?token=${share.token}`)}>
                         <Copy size={16} />
                       </Button>
                       <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => revokeShare(share.id)}>
@@ -250,7 +284,7 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
 
           <div className="pt-6 border-t border-charcoal/5 space-y-4">
             <div className="text-center space-y-1">
-              <h3 className="font-serif text-lg">Public Folio Link</h3>
+              <h3 className="font-serif text-lg">Public Collections Link</h3>
               <p className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">
                 Frictionless access for anyone with the link
               </p>
@@ -264,7 +298,7 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
                 <div className="space-y-1">
                   <p className="text-sm font-bold">Profile is Private</p>
                   <p className="text-xs text-charcoal/60 italic">
-                    Public folio links require a public profile. Change this in your profile settings.
+                    Public collection links require a public profile. Change this in your profile settings.
                   </p>
                 </div>
               </div>
@@ -298,7 +332,7 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
                 {loading ? <Loader2 className="animate-spin" size={18} /> : (
                   <>
                     <Globe size={18} />
-                    Generate Public Folio Link
+                    Generate Public Collections Link
                   </>
                 )}
               </Button>

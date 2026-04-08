@@ -60,9 +60,9 @@ export const Seeder = () => {
         createdAt: new Date().toISOString()
       });
 
-      // 3. Create Public Folio for Fake User
-      const publicFolioId = `folio-public-traveler-${Date.now()}`;
-      await setDoc(doc(db, 'folios', publicFolioId), {
+      // 3. Create Public Collection for Fake User
+      const publicCollectionId = `collection-public-traveler-${Date.now()}`;
+      await setDoc(doc(db, 'collections', publicCollectionId), {
         creatorId: fakeUid,
         creatorName: 'The Traveler',
         creatorUsername: fakeUsername,
@@ -71,15 +71,17 @@ export const Seeder = () => {
         location: 'Reykjavík, Iceland',
         coverImage: 'https://images.unsplash.com/photo-1504893524553-f858bce33c79?auto=format&fit=crop&q=80&w=800',
         privacy: 'public',
+        visibility: 'public',
+        profilePrivacy: 'public',
         createdAt: serverTimestamp(),
-        folioDate: '2025-09-10',
+        collectionDate: '2025-09-10',
         postcardCount: 5,
         photoCount: 12
       });
 
-      // 4. Create Private Folio for Fake User
-      const privateFolioId = `folio-private-traveler-${Date.now()}`;
-      await setDoc(doc(db, 'folios', privateFolioId), {
+      // 4. Create Private Collection for Fake User
+      const privateCollectionId = `collection-private-traveler-${Date.now()}`;
+      await setDoc(doc(db, 'collections', privateCollectionId), {
         creatorId: fakeUid,
         creatorName: 'The Traveler',
         creatorUsername: fakeUsername,
@@ -88,8 +90,10 @@ export const Seeder = () => {
         location: 'Studio',
         coverImage: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&q=80&w=800',
         privacy: 'private',
+        visibility: 'private',
+        profilePrivacy: 'public',
         createdAt: serverTimestamp(),
-        folioDate: '2025-10-01',
+        collectionDate: '2025-10-01',
         postcardCount: 2,
         photoCount: 4
       });

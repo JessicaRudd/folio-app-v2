@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Image as ImageIcon, Loader2, Save, MapPin, Lock, Users, Globe, Plus, Trash2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { db, storage, auth } from '../lib/firebase';
-import { doc, updateDoc, collection, query, where, getDocs, getDoc, deleteDoc, writeBatch, increment } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, getDoc, deleteDoc, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { cn } from '../lib/utils';
 
-interface EditFolioProps {
-  folio: {
+interface EditCollectionProps {
+  collection: {
     id: string;
     title: string;
     description: string;
@@ -17,7 +17,7 @@ interface EditFolioProps {
     privacy?: 'private' | 'personal' | 'public';
     visibility?: 'private' | 'public';
     allowedUsers?: string[];
-    folioDate?: string;
+    collectionDate?: string;
     postcardCount?: number;
     photoCount?: number;
     creatorName?: string;
@@ -28,25 +28,27 @@ interface EditFolioProps {
   onSuccess: () => void;
 }
 
-export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
+export const EditCollection = ({ collection: collectionData, onClose, onSuccess }: EditCollectionProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
-  const [title, setTitle] = useState(folio.title || '');
-  const [description, setDescription] = useState(folio.description || '');
-  const [location, setLocation] = useState(folio.location || '');
-  const [folioDate, setFolioDate] = useState(folio.folioDate || new Date().toISOString().split('T')[0]);
-  const [privacy, setPrivacy] = useState<'private' | 'personal' | 'public'>(folio.privacy || 'private');
-  const [visibility, setVisibility] = useState<'private' | 'public'>(folio.visibility || 'private');
-  const [allowedUsers, setAllowedUsers] = useState<string[]>(folio.allowedUsers || []);
+  const [title, setTitle] = useState(collectionData.title || '');
+  const [description, setDescription] = useState(collectionData.description || '');
+  const [location, setLocation] = useState(collectionData.location || '');
+  const [collectionDate, setCollectionDate] = useState(collectionData.collectionDate || new Date().toISOString().split('T')[0]);
+  const [privacy, setPrivacy] = useState<'private' | 'personal' | 'public'>(collectionData.privacy || 'private');
+  const [visibility, setVisibility] = useState<'private' | 'public'>(collectionData.visibility || 'private');
+  const [allowedUsers, setAllowedUsers] = useState<string[]>(collectionData.allowedUsers || []);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [coverImage, setCoverImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState(folio.coverImage);
+  const [previewUrl, setPreviewUrl] = useState(collectionData.coverImage);
   const [collectionPhotos, setCollectionPhotos] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPostcardDeleteConfirm, setShowPostcardDeleteConfirm] = useState<string | null>(null);
+  const [showPhotoDeleteConfirm, setShowPhotoDeleteConfirm] = useState<{postcardId: string, photoUrl: string} | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [postcards, setPostcards] = useState<any[]>([]);
   const [folioMetadata, setFolioMetadata] = useState<any>(null);
@@ -71,7 +73,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
       // Fetch postcards to get photos for cover selection
       const q = query(
         collection(db, 'postcards'), 
-        where('folioId', '==', folio.id)
+        where('collectionId', '==', collectionData.id)
       );
       const querySnapshot = await getDocs(q);
       const fetchedPostcards: any[] = [];
@@ -86,25 +88,25 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
       setPostcards(fetchedPostcards);
       setCollectionPhotos(Array.from(new Set(photos))); // Unique photos
 
-      // Sync counts if needed (fix for existing folios or drift)
+      // Sync counts if needed (fix for existing collections or drift)
       const updates: any = {};
-      if (folio.postcardCount !== fetchedPostcards.length) updates.postcardCount = fetchedPostcards.length;
-      if (folio.photoCount !== photos.length) updates.photoCount = photos.length;
+      if (collectionData.postcardCount !== fetchedPostcards.length) updates.postcardCount = fetchedPostcards.length;
+      if (collectionData.photoCount !== photos.length) updates.photoCount = photos.length;
       
       // Ensure creator info is present for Explore page
-      if (!folio.creatorName || !folio.creatorUsername) {
+      if (!collectionData.creatorName || !collectionData.creatorUsername) {
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
         const userData = userDoc.data();
         updates.creatorName = userData?.displayName || auth.currentUser!.displayName || '';
         updates.creatorUsername = userData?.username || '';
       }
 
-      if (Object.keys(updates).length > 0 && folio.id !== 'loose-leaves') {
-        updateDoc(doc(db, 'folios', folio.id), updates);
+      if (Object.keys(updates).length > 0 && collectionData.id !== 'loose-leaves') {
+        updateDoc(doc(db, 'collections', collectionData.id), updates);
       }
     };
     fetchData();
-  }, [folio.id]);
+  }, [collectionData.id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -164,10 +166,10 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
     setDeleting(true);
 
     try {
-      // 1. Get all postcards in this folio
+      // 1. Get all postcards in this collection
       const postcardsQuery = query(
         collection(db, 'postcards'),
-        where('folioId', '==', folio.id)
+        where('collectionId', '==', collectionData.id)
       );
       const postcardsSnapshot = await getDocs(postcardsQuery);
 
@@ -178,13 +180,13 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
       });
       await batch.commit();
 
-      // 3. Delete the folio document
-      await deleteDoc(doc(db, 'folios', folio.id));
+      // 3. Delete the collection document
+      await deleteDoc(doc(db, 'collections', collectionData.id));
 
       // 4. Try to delete cover image if it's in storage
-      if (folio.coverImage.includes('firebasestorage.googleapis.com')) {
+      if (collectionData.coverImage.includes('firebasestorage.googleapis.com')) {
         try {
-          const coverRef = ref(storage, `folios/${auth.currentUser.uid}/${folio.id}_cover`);
+          const coverRef = ref(storage, `collections/${auth.currentUser.uid}/${collectionData.id}_cover`);
           await deleteObject(coverRef);
         } catch (e) {
           console.warn('Cover image not found in storage or could not be deleted:', e);
@@ -193,7 +195,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
 
       onSuccess();
     } catch (error) {
-      console.error('Error deleting folio:', error);
+      console.error('Error deleting collection:', error);
       alert('Failed to delete collection. Please try again.');
     } finally {
       setDeleting(false);
@@ -202,15 +204,14 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
   };
 
   const handleDeletePostcard = async (postcardId: string) => {
-    if (!window.confirm('Are you sure you want to delete this postcard?')) return;
-    
+    setDeleting(true);
     try {
       await deleteDoc(doc(db, 'postcards', postcardId));
       
-      // Update folio count
-      if (folio.id !== 'loose-leaves') {
+      // Update collection count
+      if (collectionData.id !== 'loose-leaves') {
         const postcardToDelete = postcards.find(p => p.id === postcardId);
-        await updateDoc(doc(db, 'folios', folio.id), {
+        await updateDoc(doc(db, 'collections', collectionData.id), {
           postcardCount: increment(-1),
           photoCount: increment(-(postcardToDelete?.mediaUrls?.length || 0))
         });
@@ -222,15 +223,17 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
         .filter(p => p.id !== postcardId)
         .flatMap(p => p.mediaUrls || []);
       setCollectionPhotos(Array.from(new Set(allPhotos)));
+      setShowPostcardDeleteConfirm(null);
     } catch (error) {
       console.error('Error deleting postcard:', error);
       alert('Failed to delete postcard.');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const handleDeletePhoto = async (postcardId: string, photoUrl: string) => {
-    if (!window.confirm('Are you sure you want to remove this photo?')) return;
-    
+    setDeleting(true);
     try {
       const postcard = postcards.find(p => p.id === postcardId);
       if (!postcard) return;
@@ -247,9 +250,9 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
         mediaUrls: newMediaUrls
       });
 
-      // Update folio photo count
-      if (folio.id !== 'loose-leaves') {
-        await updateDoc(doc(db, 'folios', folio.id), {
+      // Update collection photo count
+      if (collectionData.id !== 'loose-leaves') {
+        await updateDoc(doc(db, 'collections', collectionData.id), {
           photoCount: increment(-1)
         });
       }
@@ -260,10 +263,12 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
       const allPhotos = postcards
         .flatMap(p => p.id === postcardId ? newMediaUrls : (p.mediaUrls || []));
       setCollectionPhotos(Array.from(new Set(allPhotos)));
-
+      setShowPhotoDeleteConfirm(null);
     } catch (error) {
       console.error('Error deleting photo:', error);
       alert('Failed to delete photo.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -290,34 +295,36 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
       let finalCoverUrl = previewUrl;
 
       if (coverImage) {
-        const storageRef = ref(storage, `folios/${auth.currentUser.uid}/${folio.id}_cover`);
+        const storageRef = ref(storage, `collections/${auth.currentUser.uid}/${collectionData.id}_cover`);
         const uploadResult = await uploadBytes(storageRef, coverImage);
         finalCoverUrl = await getDownloadURL(uploadResult.ref);
       }
 
-      const folioRef = doc(db, 'folios', folio.id);
+      const collectionRef = doc(db, 'collections', collectionData.id);
       const currentFolioToken = folioMetadata?.shareToken || '';
       const newVisibility = privacy === 'public' ? 'public' : 'private';
       
-      await updateDoc(folioRef, {
+      await updateDoc(collectionRef, {
         title,
         description,
         location,
-        folioDate,
+        collectionDate,
         coverImage: finalCoverUrl,
         privacy,
         visibility: newVisibility,
+        profilePrivacy: userProfile?.profilePrivacy || 'private',
         allowedUsers: privacy === 'personal' ? allowedUsers : [],
-        folioToken: currentFolioToken
+        folioToken: currentFolioToken,
+        updatedAt: serverTimestamp()
       });
 
       // Update denormalized fields in postcards
-      if (privacy !== folio.privacy || newVisibility !== folio.visibility || currentFolioToken !== folio.folioToken) {
+      if (privacy !== collectionData.privacy || newVisibility !== collectionData.visibility || currentFolioToken !== collectionData.folioToken) {
         const batch = writeBatch(db);
         postcards.forEach(p => {
           batch.update(doc(db, 'postcards', p.id), {
-            folioPrivacy: privacy,
-            folioVisibility: newVisibility,
+            collectionPrivacy: privacy,
+            collectionVisibility: newVisibility,
             folioToken: currentFolioToken
           });
         });
@@ -326,7 +333,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
 
       onSuccess();
     } catch (error) {
-      console.error('Error updating folio:', error);
+      console.error('Error updating collection:', error);
       alert('Failed to update collection.');
     } finally {
       setLoading(false);
@@ -453,8 +460,8 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
               <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Collection Date</label>
               <input
                 type="date"
-                value={folioDate}
-                onChange={(e) => setFolioDate(e.target.value)}
+                value={collectionDate}
+                onChange={(e) => setCollectionDate(e.target.value)}
                 className="w-full p-3 bg-white rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all"
               />
             </div>
@@ -489,7 +496,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
                         referrerPolicy="no-referrer"
                       />
                       <button 
-                        onClick={() => handleDeletePhoto(postcard.id, postcard.mediaUrls[0])}
+                        onClick={() => setShowPhotoDeleteConfirm({ postcardId: postcard.id, photoUrl: postcard.mediaUrls[0] })}
                         className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover/photo:opacity-100 transition-opacity shadow-lg"
                       >
                         <Trash2 size={12} />
@@ -501,7 +508,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
                           <div key={idx} className="w-12 h-12 rounded bg-white border border-charcoal/5 relative flex-shrink-0 group/subphoto">
                             <img src={url} className="w-full h-full object-cover rounded" referrerPolicy="no-referrer" />
                             <button 
-                              onClick={() => handleDeletePhoto(postcard.id, url)}
+                              onClick={() => setShowPhotoDeleteConfirm({ postcardId: postcard.id, photoUrl: url })}
                               className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover/subphoto:opacity-100 transition-opacity shadow-sm"
                             >
                               <Trash2 size={8} />
@@ -535,7 +542,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
                         </div>
                       </div>
                       <button 
-                        onClick={() => handleDeletePostcard(postcard.id)}
+                        onClick={() => setShowPostcardDeleteConfirm(postcard.id)}
                         className="ml-4 p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
                         title="Delete Postcard"
                       >
@@ -687,7 +694,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
                 <div className="space-y-2">
                   <h3 className="text-xl font-serif">Delete Collection?</h3>
                   <p className="text-sm text-charcoal/60">
-                    This will permanently delete <span className="font-bold text-charcoal">"{folio.title}"</span> and all its postcards. This action cannot be undone.
+                    This will permanently delete <span className="font-bold text-charcoal">"{collectionData.title}"</span> and all its postcards. This action cannot be undone.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -703,6 +710,84 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
                   <Button 
                     variant="ghost" 
                     onClick={() => setShowDeleteConfirm(false)}
+                    disabled={deleting}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {showPostcardDeleteConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[110] bg-white/95 backdrop-blur-md flex items-center justify-center p-8 text-center"
+            >
+              <div className="max-w-xs space-y-6">
+                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
+                  <Trash2 size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-serif">Delete Postcard?</h3>
+                  <p className="text-sm text-charcoal/60">
+                    This will permanently delete this postcard and all its photos. This action cannot be undone.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    variant="primary" 
+                    onClick={() => handleDeletePostcard(showPostcardDeleteConfirm)}
+                    disabled={deleting}
+                    className="bg-red-500 hover:bg-red-600 text-white border-none"
+                  >
+                    {deleting ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+                    {deleting ? 'Deleting...' : 'Yes, Delete Postcard'}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setShowPostcardDeleteConfirm(null)}
+                    disabled={deleting}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {showPhotoDeleteConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[110] bg-white/95 backdrop-blur-md flex items-center justify-center p-8 text-center"
+            >
+              <div className="max-w-xs space-y-6">
+                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
+                  <Trash2 size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-serif">Remove Photo?</h3>
+                  <p className="text-sm text-charcoal/60">
+                    Are you sure you want to remove this photo from the postcard?
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    variant="primary" 
+                    onClick={() => handleDeletePhoto(showPhotoDeleteConfirm.postcardId, showPhotoDeleteConfirm.photoUrl)}
+                    disabled={deleting}
+                    className="bg-red-500 hover:bg-red-600 text-white border-none"
+                  >
+                    {deleting ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+                    {deleting ? 'Deleting...' : 'Yes, Remove Photo'}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setShowPhotoDeleteConfirm(null)}
                     disabled={deleting}
                   >
                     Cancel

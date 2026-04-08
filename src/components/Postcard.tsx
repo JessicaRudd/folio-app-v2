@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Music, MapPin, Share2, Heart, ChevronLeft, ChevronRight, MessageCircle, Check } from 'lucide-react';
+import { Music, MapPin, Share2, Heart, ChevronLeft, ChevronRight, MessageCircle, Check, Trash2, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { cn } from '../lib/utils';
 import { socialService } from '../services/socialService';
-import { auth } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Comments } from './Comments';
 
 interface PostcardProps {
   key?: string;
   id: string;
-  folioId: string;
+  collectionId: string;
   creatorId: string;
   mediaUrls: string[];
   caption: string;
@@ -21,8 +22,8 @@ interface PostcardProps {
     title: string;
     artist: string;
   };
-  folioPrivacy?: string;
-  folioVisibility?: string;
+  collectionPrivacy?: string;
+  collectionVisibility?: string;
   folioToken?: string;
   profilePrivacy?: string;
 }
@@ -30,15 +31,15 @@ interface PostcardProps {
 export const Postcard = ({ 
   id, 
   creatorId, 
-  folioId,
+  collectionId,
   mediaUrls, 
   caption, 
   location, 
   date, 
   musicTrack, 
   isPremium = false,
-  folioPrivacy,
-  folioVisibility,
+  collectionPrivacy,
+  collectionVisibility,
   folioToken,
   profilePrivacy
 }: PostcardProps) => {
@@ -47,9 +48,17 @@ export const Postcard = ({
   const [likeCount, setLikeCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPhotoDeleteConfirm, setShowPhotoDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [localMediaUrls, setLocalMediaUrls] = useState(mediaUrls);
+
+  useEffect(() => {
+    setLocalMediaUrls(mediaUrls);
+  }, [mediaUrls]);
 
   const isOwner = auth.currentUser?.uid === creatorId;
-  const isPublic = (folioPrivacy === 'public' || folioVisibility === 'public') && profilePrivacy === 'public';
+  const isPublic = (collectionPrivacy === 'public' || collectionVisibility === 'public') && profilePrivacy === 'public';
   const showShare = isOwner || isPublic || (folioToken && profilePrivacy === 'public');
 
   const handleShare = () => {
@@ -57,12 +66,12 @@ export const Postcard = ({
     let path = '';
     
     // If the collection is fully public or has a public link enabled, use the premium public view
-    if ((folioPrivacy === 'public' || folioVisibility === 'public') && profilePrivacy === 'public') {
-      path = `/s/${folioId}`;
+    if ((collectionPrivacy === 'public' || collectionVisibility === 'public') && profilePrivacy === 'public') {
+      path = `/s/${collectionId}`;
     } 
     // Default to private guest view
     else {
-      path = `/v/${folioId}`;
+      path = `/v/${collectionId}`;
     }
 
     let shareUrl = `${baseUrl}${path}?postcardId=${id}`;
@@ -116,8 +125,50 @@ export const Postcard = ({
     return new Date(dateStr).toLocaleDateString('en-US', options);
   };
 
-  const next = () => setCurrentIndex((prev) => (prev + 1) % mediaUrls.length);
-  const prev = () => setCurrentIndex((prev) => (prev - 1 + mediaUrls.length) % mediaUrls.length);
+  const handleDeletePostcard = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'postcards', id));
+      setShowDeleteConfirm(false);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `postcards/${id}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    if (localMediaUrls.length <= 1) {
+      alert("A postcard must have at least one photo. Delete the entire postcard instead.");
+      setShowPhotoDeleteConfirm(false);
+      return;
+    }
+
+    const index = currentIndex;
+    const newUrls = [...localMediaUrls];
+    newUrls.splice(index, 1);
+    
+    setIsDeleting(true);
+    try {
+      await updateDoc(doc(db, 'postcards', id), {
+        mediaUrls: newUrls
+      });
+      setLocalMediaUrls(newUrls);
+      if (currentIndex >= newUrls.length) {
+        setCurrentIndex(newUrls.length - 1);
+      }
+      setShowPhotoDeleteConfirm(false);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `postcards/${id}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const next = () => setCurrentIndex((prev) => (prev + 1) % localMediaUrls.length);
+  const prev = () => setCurrentIndex((prev) => (prev - 1 + localMediaUrls.length) % localMediaUrls.length);
+
+  if (isDeleting && !showDeleteConfirm) return null;
 
   return (
     <div id={`postcard-${id}`} className="max-w-2xl mx-auto bg-white shadow-2xl rounded-sm overflow-hidden border-[12px] border-white">
@@ -126,7 +177,7 @@ export const Postcard = ({
         <AnimatePresence mode="wait">
           <motion.img
             key={currentIndex}
-            src={mediaUrls[currentIndex]}
+            src={localMediaUrls[currentIndex]}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -136,7 +187,20 @@ export const Postcard = ({
           />
         </AnimatePresence>
 
-        {mediaUrls.length > 1 && (
+        {isOwner && localMediaUrls.length > 1 && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowPhotoDeleteConfirm(true);
+            }}
+            className="absolute top-4 left-4 p-2 bg-white/80 rounded-full shadow-sm hover:bg-red-50 hover:text-red-600 transition-colors z-10 opacity-0 group-hover:opacity-100"
+            title="Delete this photo"
+          >
+            <X size={16} />
+          </button>
+        )}
+
+        {localMediaUrls.length > 1 && (
           <>
             <button 
               onClick={prev}
@@ -152,7 +216,7 @@ export const Postcard = ({
             </button>
             
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {mediaUrls.map((_, i) => (
+              {localMediaUrls.map((_, i) => (
                 <div 
                   key={i} 
                   className={cn(
@@ -233,6 +297,16 @@ export const Postcard = ({
                 {copied ? <Check size={20} className="text-sage" /> : <Share2 size={20} className="text-charcoal/40" />}
               </Button>
             )}
+            {isOwner && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="rounded-full p-2 text-charcoal/40 hover:text-red-600"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 size={20} />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -249,6 +323,78 @@ export const Postcard = ({
             />
           )}
         </AnimatePresence>
+
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-lg p-8 max-w-sm w-full shadow-2xl"
+            >
+              <div className="flex items-center gap-3 text-red-600 mb-4">
+                <AlertTriangle size={28} />
+                <h3 className="text-xl font-bold">Delete Postcard?</h3>
+              </div>
+              <p className="text-charcoal/60 mb-8 leading-relaxed">
+                This action cannot be undone. All photos and comments associated with this postcard will be permanently removed.
+              </p>
+              <div className="flex gap-4">
+                <Button 
+                  variant="ghost" 
+                  className="flex-1 font-bold uppercase tracking-widest text-xs" 
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="primary" 
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none font-bold uppercase tracking-widest text-xs"
+                  onClick={handleDeletePostcard}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? <Loader2 className="animate-spin" size={18} /> : 'Delete'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showPhotoDeleteConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white rounded-lg p-8 max-w-sm w-full shadow-2xl"
+            >
+              <div className="flex items-center gap-3 text-red-600 mb-4">
+                <AlertTriangle size={28} />
+                <h3 className="text-xl font-bold">Remove Photo?</h3>
+              </div>
+              <p className="text-charcoal/60 mb-8 leading-relaxed">
+                Are you sure you want to remove this photo from the postcard? This action cannot be undone.
+              </p>
+              <div className="flex gap-4">
+                <Button 
+                  variant="ghost" 
+                  className="flex-1 font-bold uppercase tracking-widest text-xs" 
+                  onClick={() => setShowPhotoDeleteConfirm(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="primary" 
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none font-bold uppercase tracking-widest text-xs"
+                  onClick={handleDeletePhoto}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? <Loader2 className="animate-spin" size={18} /> : 'Remove'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {musicTrack && (
           <motion.div 

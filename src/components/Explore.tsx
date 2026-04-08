@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { Globe, Search, Loader2, User, MapPin, Calendar, ArrowLeft, ChevronRight, Heart, MessageCircle } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
-import { FolioGrid } from './FolioGrid';
+import { CollectionGrid } from './CollectionGrid';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Postcard } from './Postcard';
@@ -21,7 +21,7 @@ export const Explore = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [publicFolios, setPublicFolios] = useState<any[]>([]);
+  const [publicCollections, setPublicCollections] = useState<any[]>([]);
   const [publicCurators, setPublicCurators] = useState<any[]>([]);
   const [publicPostcards, setPublicPostcards] = useState<any[]>([]);
   const [feedPostcards, setFeedPostcards] = useState<any[]>([]);
@@ -54,25 +54,25 @@ export const Explore = () => {
       setLoading(true);
       setError(null);
       try {
-        // 1. Fetch Public Folios
-        const foliosRef = collection(db, 'folios');
-        const foliosQuery = query(
-          foliosRef,
+        // 1. Fetch Public Collections
+        const collectionsRef = collection(db, 'collections');
+        const collectionsQuery = query(
+          collectionsRef,
           where('privacy', '==', 'public'),
           where('visibility', '==', 'public'),
           where('profilePrivacy', '==', 'public'),
           limit(20)
         );
         
-        const foliosSnapshot = await getDocs(foliosQuery);
-        const folios = foliosSnapshot.docs.map(doc => ({
+        const collectionsSnapshot = await getDocs(collectionsQuery);
+        const collections = collectionsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          folioDate: doc.data().folioDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+          collectionDate: doc.data().collectionDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
           createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
         }));
 
-        setPublicFolios(folios);
+        setPublicCollections(collections);
 
         // 2. Fetch Public Curators
         const curatorsRef = collection(db, 'public_profiles');
@@ -90,9 +90,8 @@ export const Explore = () => {
         // 3. Fetch Public Postcards (for everyone)
         const publicPostcardsQuery = query(
           collection(db, 'postcards'),
-          where('folioVisibility', '==', 'public'),
+          where('collectionVisibility', '==', 'public'),
           where('profilePrivacy', '==', 'public'),
-          orderBy('createdAt', 'desc'),
           limit(20)
         );
         try {
@@ -123,8 +122,8 @@ export const Explore = () => {
               const q = query(
                 collection(db, 'postcards'),
                 where('creatorId', 'in', chunk),
-                where('folioVisibility', '==', 'public'),
-                orderBy('createdAt', 'desc'),
+                where('collectionVisibility', '==', 'public'),
+                where('profilePrivacy', '==', 'public'),
                 limit(10)
               );
               try {
@@ -141,25 +140,25 @@ export const Explore = () => {
           }
 
           // Fetch postcards from invited private collections
-          const invitedFoliosQuery = query(
-            collection(db, 'folios'),
+          const invitedCollectionsQuery = query(
+            collection(db, 'collections'),
             where('privacy', '==', 'personal'),
             where('allowedUsers', 'array-contains', auth.currentUser.email),
             limit(10)
           );
-          const invitedFoliosSnap = await getDocs(invitedFoliosQuery);
-          const invitedFolioIds = invitedFoliosSnap.docs.map(doc => doc.id);
+          const invitedCollectionsSnap = await getDocs(invitedCollectionsQuery);
+          const invitedCollectionIds = invitedCollectionsSnap.docs.map(doc => doc.id);
 
           let invitedPostcards: any[] = [];
-          if (invitedFolioIds.length > 0) {
+          if (invitedCollectionIds.length > 0) {
             const chunks = [];
-            for (let i = 0; i < invitedFolioIds.length; i += 10) {
-              chunks.push(invitedFolioIds.slice(i, i + 10));
+            for (let i = 0; i < invitedCollectionIds.length; i += 10) {
+              chunks.push(invitedCollectionIds.slice(i, i + 10));
             }
             for (const chunk of chunks) {
               const q = query(
                 collection(db, 'postcards'),
-                where('folioId', 'in', chunk),
+                where('collectionId', 'in', chunk),
                 orderBy('createdAt', 'desc'),
                 limit(10)
               );
@@ -194,12 +193,12 @@ export const Explore = () => {
     fetchExploreData();
   }, [user]);
 
-  const filteredFolios = publicFolios.filter(folio => 
-    folio.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    folio.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    folio.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    folio.creatorName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    folio.creatorUsername?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredCollections = publicCollections.filter(collection => 
+    collection.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    collection.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    collection.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    collection.creatorName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    collection.creatorUsername?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredCurators = publicCurators.filter(curator => 
@@ -233,7 +232,7 @@ export const Explore = () => {
           className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
         >
           <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
-          Folio Home
+          Home
         </Link>
         <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/10">
           Discovery Engine &mdash; Curated Collections
@@ -334,26 +333,26 @@ export const Explore = () => {
               </section>
             )}
 
-            {/* Folios Section */}
+            {/* Collections Section */}
             <section className="space-y-12">
               <div className="flex items-baseline justify-between border-b border-charcoal/5 pb-4">
                 <h2 className="text-xs font-bold uppercase tracking-[0.3em] text-charcoal/30">Public Collections</h2>
                 <div className="text-[10px] font-bold uppercase tracking-widest text-charcoal/20">
-                  {filteredFolios.length} Collections Found
+                  {filteredCollections.length} Collections Found
                 </div>
               </div>
 
-              {filteredFolios.length === 0 ? (
+              {filteredCollections.length === 0 ? (
                 <div className="py-32 text-center space-y-4">
                   <p className="text-charcoal/40 italic editorial-text text-lg">No collections found matching your search.</p>
                   <Button variant="ghost" size="sm" onClick={() => setSearchQuery('')} className="text-sage">Clear Search</Button>
                 </div>
               ) : (
-                <FolioGrid 
-                  folios={filteredFolios} 
+                <CollectionGrid 
+                  collections={filteredCollections} 
                   onSelect={(id) => navigate(`/s/${id}`)} 
-                  onShare={(folio) => {
-                    const url = `${window.location.origin}/s/${folio.id}`;
+                  onShare={(collection) => {
+                    const url = `${window.location.origin}/s/${collection.id}`;
                     navigator.clipboard.writeText(url);
                     alert('Link copied to clipboard!');
                   }}
@@ -378,15 +377,15 @@ export const Explore = () => {
                       key={postcard.id}
                       id={postcard.id}
                       creatorId={postcard.creatorId}
-                      folioId={postcard.folioId}
+                      collectionId={postcard.collectionId}
                       mediaUrls={postcard.mediaUrls}
                       caption={postcard.caption}
                       location={postcard.location}
                       date={postcard.date}
                       musicTrack={postcard.musicTrack}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
-                      folioPrivacy={postcard.folioPrivacy || 'public'}
-                      folioVisibility={postcard.folioVisibility || 'public'}
+                      collectionPrivacy={postcard.collectionPrivacy || 'public'}
+                      collectionVisibility={postcard.collectionVisibility || 'public'}
                       profilePrivacy={postcard.profilePrivacy || 'public'}
                     />
                   ))}
@@ -410,15 +409,15 @@ export const Explore = () => {
                       key={postcard.id}
                       id={postcard.id}
                       creatorId={postcard.creatorId}
-                      folioId={postcard.folioId}
+                      collectionId={postcard.collectionId}
                       mediaUrls={postcard.mediaUrls}
                       caption={postcard.caption}
                       location={postcard.location}
                       date={postcard.date}
                       musicTrack={postcard.musicTrack}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
-                      folioPrivacy={postcard.folioPrivacy || 'public'}
-                      folioVisibility={postcard.folioVisibility || 'public'}
+                      collectionPrivacy={postcard.collectionPrivacy || 'public'}
+                      collectionVisibility={postcard.collectionVisibility || 'public'}
                       profilePrivacy={postcard.profilePrivacy || 'public'}
                     />
                   ))}

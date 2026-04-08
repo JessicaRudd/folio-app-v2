@@ -35,11 +35,11 @@ import {
 import { cn } from '../lib/utils';
 
 interface ShareModalProps {
-  folio: any;
+  collection: any;
   onClose: () => void;
 }
 
-export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
+export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionData, onClose }) => {
   const [activeTab, setActiveTab] = useState<'public' | 'private' | 'curators'>('public');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -47,13 +47,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteType, setInviteType] = useState<'guest' | 'curator'>('guest');
   const [inviteRole, setInviteRole] = useState<'viewer' | 'editor'>('viewer');
+  const [expiration, setExpiration] = useState<'24h' | '7d' | '30d' | 'never'>('7d');
 
-  const publicUrl = `${window.location.origin}/s/${folio.id}`;
+  const publicUrl = `${window.location.origin}/s/${collectionData.id}`;
 
   useEffect(() => {
     const q = query(
       collection(db, 'shares'),
-      where('folioId', '==', folio.id)
+      where('collectionId', '==', collectionData.id)
     );
 
     const unsubShares = onSnapshot(q, (snapshot) => {
@@ -63,42 +64,47 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
     return () => {
       unsubShares();
     };
-  }, [folio.id]);
+  }, [collectionData.id]);
 
   const togglePublic = async () => {
     // Check if profile is public first
     const userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
     const userData = userDoc.data();
     
-    if (folio.visibility !== 'public' && userData?.profilePrivacy !== 'public') {
+    if (collectionData.visibility !== 'public' && userData?.profilePrivacy !== 'public') {
       alert('You must set your profile to "Public" in settings before enabling a public link.');
       return;
     }
 
     setLoading(true);
     try {
-      const newVisibility = folio.visibility === 'public' ? 'private' : 'public';
+      const newVisibility = collectionData.visibility === 'public' ? 'private' : 'public';
       const batch = writeBatch(db);
       
-      // 1. Update Folio
-      batch.update(doc(db, 'folios', folio.id), {
-        visibility: newVisibility
+      // Generate folioToken if missing
+      const folioToken = collectionData.folioToken || Math.random().toString(36).substring(2, 15);
+
+      // 1. Update Collection
+      batch.update(doc(db, 'collections', collectionData.id), {
+        visibility: newVisibility,
+        folioToken: folioToken
       });
       
       // 2. Update Postcards
-      const postcardsQuery = query(collection(db, 'postcards'), where('folioId', '==', folio.id));
+      const postcardsQuery = query(collection(db, 'postcards'), where('collectionId', '==', collectionData.id));
       const postcardsSnap = await getDocs(postcardsQuery);
       
       postcardsSnap.docs.forEach(p => {
         batch.update(p.ref, {
-          folioVisibility: newVisibility
+          collectionVisibility: newVisibility,
+          folioToken: folioToken
         });
       });
 
       await batch.commit();
     } catch (err: any) {
       console.error('Error toggling visibility:', err);
-      handleFirestoreError(err, OperationType.UPDATE, `folios/${folio.id}`);
+      handleFirestoreError(err, OperationType.UPDATE, `collections/${collectionData.id}`);
     } finally {
       setLoading(false);
     }
@@ -125,16 +131,44 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
         }
 
         const targetUid = userSnap.docs[0].id;
-        const currentCurators = folio.curators || {};
-        await updateDoc(doc(db, 'folios', folio.id), {
+        await updateDoc(doc(db, 'collections', collectionData.id), {
           [`curators.${targetUid}`]: inviteRole
         });
       } else {
-        // Create Guest Share
+        // Ensure collection has a folioToken for guest access
+        let currentFolioToken = collectionData.folioToken;
+        if (!currentFolioToken) {
+          currentFolioToken = Math.random().toString(36).substring(2, 15);
+          const batch = writeBatch(db);
+          batch.update(doc(db, 'collections', collectionData.id), {
+            folioToken: currentFolioToken
+          });
+          
+          const postcardsQuery = query(collection(db, 'postcards'), where('collectionId', '==', collectionData.id));
+          const postcardsSnap = await getDocs(postcardsQuery);
+          postcardsSnap.docs.forEach(p => {
+            batch.update(p.ref, { folioToken: currentFolioToken });
+          });
+          await batch.commit();
+        }
+
+        // Create Guest Share with Token and Expiration
+        const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        
+        let expiresAt: Date | null = null;
+        if (expiration !== 'never') {
+          expiresAt = new Date();
+          if (expiration === '24h') expiresAt.setHours(expiresAt.getHours() + 24);
+          if (expiration === '7d') expiresAt.setDate(expiresAt.getDate() + 7);
+          if (expiration === '30d') expiresAt.setDate(expiresAt.getDate() + 30);
+        }
+
         await addDoc(collection(db, 'shares'), {
-          folioId: folio.id,
+          collectionId: collectionData.id,
           type: 'guest',
-          email: inviteEmail.trim(),
+          email: inviteEmail.trim().toLowerCase(),
+          token,
+          expiresAt: expiresAt ? expiresAt.toISOString() : null,
           status: 'active',
           createdAt: serverTimestamp(),
           accessedBy: []
@@ -159,7 +193,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
   const removeCurator = async (uid: string) => {
     try {
       const { deleteField } = await import('firebase/firestore');
-      await updateDoc(doc(db, 'folios', folio.id), {
+      await updateDoc(doc(db, 'collections', collectionData.id), {
         [`curators.${uid}`]: deleteField()
       });
     } catch (err) {
@@ -219,14 +253,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       "p-2 rounded-lg",
-                      folio.visibility === 'public' ? "bg-sage/10 text-sage" : "bg-charcoal/5 text-charcoal/40"
+                      collectionData.visibility === 'public' ? "bg-sage/10 text-sage" : "bg-charcoal/5 text-charcoal/40"
                     )}>
                       <Globe size={20} />
                     </div>
                     <div>
                       <div className="font-bold text-sm">Public Link</div>
                       <div className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">
-                        {folio.visibility === 'public' ? 'Enabled' : 'Disabled'}
+                        {collectionData.visibility === 'public' ? 'Enabled' : 'Disabled'}
                       </div>
                     </div>
                   </div>
@@ -235,17 +269,17 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
                     disabled={loading}
                     className={cn(
                       "w-12 h-6 rounded-full transition-colors relative",
-                      folio.visibility === 'public' ? "bg-sage" : "bg-charcoal/20"
+                      collectionData.visibility === 'public' ? "bg-sage" : "bg-charcoal/20"
                     )}
                   >
                     <div className={cn(
                       "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
-                      folio.visibility === 'public' ? "left-7" : "left-1"
+                      collectionData.visibility === 'public' ? "left-7" : "left-1"
                     )} />
                   </button>
                 </div>
 
-                {folio.visibility === 'public' ? (
+                {collectionData.visibility === 'public' ? (
                   <div className="space-y-4">
                     <div className="p-4 bg-sage/5 border border-sage/10 rounded-2xl flex items-center justify-between gap-4">
                       <div className="flex-1 truncate text-sm text-sage font-mono">
@@ -281,27 +315,47 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
                 className="space-y-6"
               >
                 <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30" size={18} />
-                      <input 
-                        type="email"
-                        placeholder="guest@email.com"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-canvas rounded-xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all"
-                      />
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30" size={18} />
+                        <input 
+                          type="email"
+                          placeholder="guest@email.com"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 bg-canvas rounded-xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all"
+                        />
+                      </div>
+                      <Button 
+                        variant="primary" 
+                        onClick={() => {
+                          setInviteType('guest');
+                          createShare();
+                        }}
+                        disabled={loading || !inviteEmail}
+                      >
+                        {loading ? <Loader2 className="animate-spin" size={18} /> : 'Invite'}
+                      </Button>
                     </div>
-                    <Button 
-                      variant="primary" 
-                      onClick={() => {
-                        setInviteType('guest');
-                        createShare();
-                      }}
-                      disabled={loading || !inviteEmail}
-                    >
-                      {loading ? <Loader2 className="animate-spin" size={18} /> : 'Invite'}
-                    </Button>
+                    
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Expires in:</span>
+                      <div className="flex gap-2 p-1 bg-canvas rounded-lg">
+                        {(['24h', '7d', '30d', 'never'] as const).map((exp) => (
+                          <button
+                            key={exp}
+                            onClick={() => setExpiration(exp)}
+                            className={cn(
+                              "px-2 py-1 text-[9px] font-bold uppercase tracking-widest rounded-md transition-all",
+                              expiration === exp ? "bg-white text-sage shadow-sm" : "text-charcoal/40 hover:text-charcoal"
+                            )}
+                          >
+                            {exp}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                   <p className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold text-center">
                     Generates a private, OTP-protected link
@@ -323,13 +377,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
                           </div>
                           <div>
                             <div className="text-sm font-bold">{share.email}</div>
-                            <div className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">
-                              {share.accessedBy?.length || 0} Accesses
+                            <div className="text-[9px] text-charcoal/40 uppercase tracking-widest font-bold">
+                              {share.expiresAt ? `Expires: ${new Date(share.expiresAt).toLocaleDateString()}` : 'Never expires'}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/v/${share.id}`)}>
+                          <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/v/${share.collectionId}/${share.id}?token=${share.token}`)}>
                             <Copy size={16} />
                           </Button>
                           <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => revokeShare(share.id)}>
@@ -415,7 +469,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
                     </div>
 
                     {/* Other Curators */}
-                    {Object.entries(folio.curators || {}).map(([uid, role]: [string, any]) => (
+                    {Object.entries(collectionData.curators || {}).map(([uid, role]: [string, any]) => (
                       <CuratorItem key={uid} uid={uid} role={role} onRemove={() => removeCurator(uid)} />
                     ))}
                   </div>

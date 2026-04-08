@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
-import { FolioGrid } from './components/FolioGrid';
+import { CollectionGrid } from './components/CollectionGrid';
 import { Postcard } from './components/Postcard';
 import { GuestView } from './components/GuestView';
 import { CreatePostcard } from './components/CreatePostcard';
-import { EditFolio } from './components/EditFolio';
+import { EditCollection } from './components/EditCollection';
 import { ProfilePage } from './components/ProfilePage';
 import { PublicProfile } from './components/PublicProfile';
 import { Explore } from './components/Explore';
 import { MapView } from './components/MapView';
 import { Onboarding } from './components/Onboarding';
-import { PublicFolioView } from './components/PublicFolioView';
-import { FolioView } from './components/FolioView';
+import { PublicCollectionView } from './components/PublicCollectionView';
+import { CollectionView } from './components/CollectionView';
 import { ShareModal } from './components/ShareModal';
 import { FolioShareModal } from './components/FolioShareModal';
 import { Button } from './components/ui/Button';
@@ -37,15 +37,15 @@ const MOCK_FOLIOS = [
 function CreatorDashboard() {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [selectedFolioId, setSelectedFolioId] = useState<string | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [view, setView] = useState<'grid' | 'postcard'>('grid');
   const [isCreating, setIsCreating] = useState(false);
-  const [isEditingFolio, setIsEditingFolio] = useState(false);
-  const [isSharingFolio, setIsSharingFolio] = useState(false);
+  const [isEditingCollection, setIsEditingCollection] = useState(false);
+  const [isSharingCollection, setIsSharingCollection] = useState(false);
   const [isSharingFullFolio, setIsSharingFullFolio] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [realPostcards, setRealPostcards] = useState<any[]>([]);
-  const [realFolios, setRealFolios] = useState<any[]>([]);
+  const [realCollections, setRealCollections] = useState<any[]>([]);
   const [looseStats, setLooseStats] = useState({ postcards: 0, photos: 0 });
 
   useEffect(() => {
@@ -70,7 +70,7 @@ function CreatorDashboard() {
     const q = query(
       collection(db, 'postcards'),
       where('creatorId', '==', user.uid),
-      where('folioId', '==', 'loose-leaves')
+      where('collectionId', '==', 'loose-leaves')
     );
 
     return onSnapshot(q, (snapshot) => {
@@ -82,32 +82,32 @@ function CreatorDashboard() {
     });
   }, [user]);
 
-  // Fetch Folios
+  // Fetch Collections
   useEffect(() => {
     if (!user) {
-      setRealFolios([]);
+      setRealCollections([]);
       return;
     }
 
-    // Query for folios created by user
+    // Query for collections created by user
     const q1 = query(
-      collection(db, 'folios'),
+      collection(db, 'collections'),
       where('creatorId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
 
-    // Query for folios where user is a curator
+    // Query for collections where user is a curator
     const q2 = query(
-      collection(db, 'folios'),
-      where('curators', 'array-contains', user.uid)
+      collection(db, 'collections'),
+      where('curatorIds', 'array-contains', user.uid)
     );
 
-    let folios1: any[] = [];
-    let folios2: any[] = [];
+    let collections1: any[] = [];
+    let collections2: any[] = [];
 
-    const updateFolios = () => {
-      const combined = [...folios1];
-      folios2.forEach(f => {
+    const updateCollections = () => {
+      const combined = [...collections1];
+      collections2.forEach(f => {
         if (!combined.some(c => c.id === f.id)) combined.push(f);
       });
       
@@ -115,12 +115,12 @@ function CreatorDashboard() {
       
       const docs = sorted.map(f => ({
         ...f,
-        folioDate: f.folioDate || f.createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        collectionDate: f.collectionDate || f.createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
         createdAt: f.createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
       }));
 
       const hasLooseLeaves = docs.some(d => d.id === 'loose-leaves');
-      const finalFolios = hasLooseLeaves ? docs : [
+      const finalCollections = hasLooseLeaves ? docs : [
         {
           id: 'loose-leaves',
           title: 'Loose Leaves',
@@ -131,17 +131,17 @@ function CreatorDashboard() {
         },
         ...docs
       ];
-      setRealFolios(finalFolios);
+      setRealCollections(finalCollections);
     };
 
     const unsub1 = onSnapshot(q1, (snap) => {
-      folios1 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      updateFolios();
+      collections1 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateCollections();
     });
 
     const unsub2 = onSnapshot(q2, (snap) => {
-      folios2 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      updateFolios();
+      collections2 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateCollections();
     });
 
     return () => {
@@ -150,20 +150,20 @@ function CreatorDashboard() {
     };
   }, [user]);
 
-  // Fetch Postcards for selected folio
+  // Fetch Postcards for selected collection
   useEffect(() => {
-    if (!selectedFolioId || !user) return;
+    if (!selectedCollectionId || !user) return;
 
-    const q = selectedFolioId === 'loose-leaves' 
+    const q = selectedCollectionId === 'loose-leaves' 
       ? query(
           collection(db, 'postcards'),
-          where('folioId', '==', selectedFolioId),
+          where('collectionId', '==', selectedCollectionId),
           where('creatorId', '==', user.uid),
           orderBy('createdAt', 'desc')
         )
       : query(
           collection(db, 'postcards'),
-          where('folioId', '==', selectedFolioId),
+          where('collectionId', '==', selectedCollectionId),
           orderBy('createdAt', 'desc')
         );
 
@@ -179,28 +179,28 @@ function CreatorDashboard() {
     });
 
     return () => unsubscribe();
-  }, [selectedFolioId, user]);
+  }, [selectedCollectionId, user]);
 
   const handleLogout = () => signOut(auth);
 
-  const handleShareCollection = (folio: any) => {
+  const handleShareCollection = (collection: any) => {
     const baseUrl = window.location.origin;
     let shareUrl = '';
     
     // If it's a public collection or has a public link enabled, use the premium public view
-    if ((folio.privacy === 'public' || folio.visibility === 'public') && userProfile?.profilePrivacy === 'public') {
-      shareUrl = `${baseUrl}/s/${folio.id}`;
+    if ((collection.privacy === 'public' || collection.visibility === 'public') && userProfile?.profilePrivacy === 'public') {
+      shareUrl = `${baseUrl}/s/${collection.id}`;
     } 
     // Otherwise, use the private guest view link
     else {
-      shareUrl = `${baseUrl}/v/${folio.id}`;
+      shareUrl = `${baseUrl}/v/${collection.id}`;
     }
 
     navigator.clipboard.writeText(shareUrl);
     alert('Link copied to clipboard!');
   };
 
-  const selectedFolio = realFolios.find(f => f.id === selectedFolioId);
+  const selectedCollection = realCollections.find(f => f.id === selectedCollectionId);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -222,7 +222,7 @@ function CreatorDashboard() {
               className="space-y-12"
             >
               <header className="px-6 text-center space-y-4 relative">
-                <h2 className="text-5xl md:text-7xl">Folio</h2>
+                <h2 className="text-5xl md:text-7xl">Collections</h2>
                 <p className="text-charcoal/60 max-w-xl mx-auto italic">
                   A curated space for your digital postcards. Private memories, shared with intention.
                 </p>
@@ -235,15 +235,15 @@ function CreatorDashboard() {
                       onClick={() => setIsSharingFullFolio(true)}
                     >
                       <Share2 size={16} />
-                      Share Folio
+                      Share Collections
                     </Button>
                   </div>
                 )}
               </header>
 
               {user ? (
-                <FolioGrid 
-                  folios={realFolios.map(f => ({
+                <CollectionGrid 
+                  collections={realCollections.map(f => ({
                     ...f,
                     coverImage: f.coverImage || 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&q=80&w=800',
                     description: f.description || 'A new collection of memories.',
@@ -251,7 +251,7 @@ function CreatorDashboard() {
                     photoCount: f.id === 'loose-leaves' ? looseStats.photos : f.photoCount || 0
                   }))} 
                   onSelect={(id) => {
-                    setSelectedFolioId(id);
+                    setSelectedCollectionId(id);
                     setView('postcard');
                   }} 
                   onShare={handleShareCollection}
@@ -282,24 +282,24 @@ function CreatorDashboard() {
                   Back to Collections
                 </Button>
                 
-                {user && selectedFolio && (
+                {user && selectedCollection && (
                   <div className="flex gap-4">
-                    {selectedFolioId !== 'loose-leaves' && user.uid === selectedFolio.creatorId && (
-                      <Button variant="ghost" size="sm" className="gap-2" onClick={() => setIsEditingFolio(true)}>
+                    {selectedCollectionId !== 'loose-leaves' && user.uid === selectedCollection.creatorId && (
+                      <Button variant="ghost" size="sm" className="gap-2" onClick={() => setIsEditingCollection(true)}>
                         <Settings size={16} />
                         Edit Collection
                       </Button>
                     )}
-                    {user.uid === selectedFolio.creatorId && (
-                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsSharingFolio(true)}>
+                    {user.uid === selectedCollection.creatorId && (
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsSharingCollection(true)}>
                         <Share2 size={16} />
                         Share Collection
                       </Button>
                     )}
-                    {(user.uid === selectedFolio.creatorId || (selectedFolio.curators && selectedFolio.curators[user.uid] === 'editor')) && (
+                    {(user.uid === selectedCollection.creatorId || (selectedCollection.curators && selectedCollection.curators[user.uid] === 'editor')) && (
                       <Button variant="secondary" size="sm" className="gap-2" onClick={() => setIsCreating(true)}>
                         <Plus size={16} />
-                        Add to {selectedFolio?.title}
+                        Add to {selectedCollection?.title}
                       </Button>
                     )}
                   </div>
@@ -307,7 +307,7 @@ function CreatorDashboard() {
               </div>
 
               <header className="text-center space-y-2">
-                <h2 className="text-4xl">{selectedFolio?.title}</h2>
+                <h2 className="text-4xl">{selectedCollection?.title}</h2>
                 <p className="text-charcoal/40 text-sm uppercase tracking-[0.2em] font-bold">
                   {realPostcards.length} Moments Captured
                 </p>
@@ -316,7 +316,7 @@ function CreatorDashboard() {
               <div className="space-y-24 pb-24">
                 {realPostcards.length === 0 ? (
                   <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-charcoal/10">
-                    <p className="text-charcoal/40 italic">No postcards in this folio yet.</p>
+                    <p className="text-charcoal/40 italic">No postcards in this collection yet.</p>
                     {user && (
                       <Button variant="ghost" className="mt-4" onClick={() => setIsCreating(true)}>
                         Create your first postcard
@@ -329,15 +329,15 @@ function CreatorDashboard() {
                       key={postcard.id} 
                       id={postcard.id}
                       creatorId={postcard.creatorId}
-                      folioId={postcard.folioId}
+                      collectionId={postcard.collectionId}
                       mediaUrls={postcard.mediaUrls}
                       caption={postcard.caption}
                       location={postcard.location}
                       date={postcard.date}
                       musicTrack={postcard.musicTrack}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
-                      folioPrivacy={postcard.folioPrivacy}
-                      folioVisibility={postcard.folioVisibility}
+                      collectionPrivacy={postcard.collectionPrivacy}
+                      collectionVisibility={postcard.collectionVisibility}
                       folioToken={postcard.folioToken}
                       profilePrivacy={userProfile?.profilePrivacy}
                     />
@@ -368,20 +368,20 @@ function CreatorDashboard() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {isEditingFolio && selectedFolio && (
-          <EditFolio 
-            folio={selectedFolio}
-            onClose={() => setIsEditingFolio(false)}
-            onSuccess={() => setIsEditingFolio(false)}
+        {isEditingCollection && selectedCollection && (
+          <EditCollection 
+            collection={selectedCollection}
+            onClose={() => setIsEditingCollection(false)}
+            onSuccess={() => setIsEditingCollection(false)}
           />
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {isSharingFolio && selectedFolio && (
+        {isSharingCollection && selectedCollection && (
           <ShareModal 
-            folio={selectedFolio}
-            onClose={() => setIsSharingFolio(false)}
+            collection={selectedCollection}
+            onClose={() => setIsSharingCollection(false)}
           />
         )}
       </AnimatePresence>
@@ -413,11 +413,11 @@ export default function App() {
         <Route path="/u/:username" element={<PublicProfile />} />
         <Route path="/explore" element={<Explore />} />
         <Route path="/map" element={<MapView />} />
-        <Route path="/v/:folioId" element={<GuestView />} />
-        <Route path="/v/:folioId/:secureToken" element={<GuestView />} />
-        <Route path="/s/:folioId" element={<PublicFolioView />} />
-        <Route path="/f/:username" element={<FolioView />} />
-        <Route path="/f/:username/invite/:shareId" element={<FolioView />} />
+        <Route path="/v/:collectionId" element={<GuestView />} />
+        <Route path="/v/:collectionId/:secureToken" element={<GuestView />} />
+        <Route path="/s/:collectionId" element={<PublicCollectionView />} />
+        <Route path="/f/:username" element={<CollectionView />} />
+        <Route path="/f/:username/invite/:shareId" element={<CollectionView />} />
       </Routes>
     </Router>
   );

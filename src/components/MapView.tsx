@@ -25,7 +25,7 @@ interface PostcardLocation {
   locationName: string;
   mediaUrl: string;
   date: string;
-  folioId: string;
+  collectionId: string;
 }
 
 export const MapView = () => {
@@ -61,7 +61,7 @@ export const MapView = () => {
               locationName: postcard.location || 'Untitled',
               mediaUrl: postcard.mediaUrls?.[0] || '',
               date: postcard.postcardDate || postcard.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-              folioId: postcard.folioId
+              collectionId: postcard.collectionId
             });
             continue;
           }
@@ -86,7 +86,7 @@ export const MapView = () => {
                   locationName: postcard.location,
                   mediaUrl: postcard.mediaUrls?.[0] || '',
                   date: postcard.postcardDate || postcard.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-                  folioId: postcard.folioId
+                  collectionId: postcard.collectionId
                 });
 
                 // Update Firestore with coordinates for future loads
@@ -180,9 +180,9 @@ export const MapView = () => {
                     variant="primary" 
                     size="sm" 
                     className="w-full text-[10px] h-8"
-                    onClick={() => navigate(`/?folio=${loc.folioId}`)}
+                    onClick={() => navigate(`/?collection=${loc.collectionId}`)}
                   >
-                    View Folio
+                    View Collection
                   </Button>
                 </div>
               </Popup>

@@ -14,7 +14,7 @@ interface CreatePostcardProps {
   onLimitReached?: (type: 'folios' | 'postcards' | 'photos') => void;
 }
 
-interface Folio {
+interface Collection {
   id: string;
   title: string;
 }
@@ -32,11 +32,11 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
   const [musicSearch, setMusicSearch] = useState('');
   const [selectedTrack, setSelectedTrack] = useState<{ title: string; artist: string } | null>(null);
   
-  // Folio State
-  const [folios, setFolios] = useState<Folio[]>([]);
-  const [selectedFolioId, setSelectedFolioId] = useState<string>('loose-leaves');
-  const [isCreatingNewFolio, setIsCreatingNewFolio] = useState(false);
-  const [newFolioTitle, setNewFolioTitle] = useState('');
+  // Collection State
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>('loose-leaves');
+  const [isCreatingNewCollection, setIsCreatingNewCollection] = useState(false);
+  const [newCollectionTitle, setNewCollectionTitle] = useState('');
 
   // Geolocation State
   const [isLocating, setIsLocating] = useState(false);
@@ -64,10 +64,10 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           setFolioMetadata(metaDoc.data());
         }
         
-        const q = query(collection(db, 'folios'), where('creatorId', '==', auth.currentUser.uid));
+        const q = query(collection(db, 'collections'), where('creatorId', '==', auth.currentUser.uid));
         const querySnapshot = await getDocs(q);
-        const fetchedFolios = querySnapshot.docs.map(doc => ({ id: doc.id, title: doc.data().title }));
-        setFolios(fetchedFolios);
+        const fetchedCollections = querySnapshot.docs.map(doc => ({ id: doc.id, title: doc.data().title }));
+        setCollections(fetchedCollections);
       } catch (err) {
         console.error('Error fetching user data:', err);
       }
@@ -265,7 +265,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
     const isAdmin = userStats?.role === 'admin';
     const isPremium = userStats?.isPremium;
     if (!isAdmin && !isPremium) {
-      if (isCreatingNewFolio && (userStats?.total_folio_count || 0) >= 10) {
+      if (isCreatingNewCollection && (userStats?.total_collection_count || 0) >= 10) {
         if (onLimitReached) onLimitReached('folios');
         else alert('Free accounts are limited to 10 collections.');
         return;
@@ -279,30 +279,31 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
 
     setLoading(true);
     try {
-      let finalFolioId = selectedFolioId;
+      let finalCollectionId = selectedCollectionId;
 
-      // 1. Create New Folio if needed
-      if (isCreatingNewFolio && newFolioTitle.trim()) {
-        const folioDoc = await addDoc(collection(db, 'folios'), {
-          title: newFolioTitle.trim(),
+      // 1. Create New Collection if needed
+      if (isCreatingNewCollection && newCollectionTitle.trim()) {
+        const collectionDoc = await addDoc(collection(db, 'collections'), {
+          title: newCollectionTitle.trim(),
           creatorId: auth.currentUser!.uid,
           creatorName: userStats?.displayName || auth.currentUser!.displayName || '',
           creatorUsername: userStats?.username || '',
           createdAt: serverTimestamp(),
-          folioDate: postcardDate,
+          collectionDate: postcardDate,
           postcardCount: 0,
           photoCount: 0,
           privacy: 'private',
           visibility: 'private',
           profilePrivacy: userStats?.profilePrivacy || 'private',
           curators: {},
+          curatorIds: [],
           folioToken: folioMetadata?.shareToken || ''
         });
-        finalFolioId = folioDoc.id;
+        finalCollectionId = collectionDoc.id;
         
-        // Increment Folio Count
+        // Increment Collection Count
         await updateDoc(doc(db, 'users', auth.currentUser!.uid), {
-          total_folio_count: increment(1)
+          total_collection_count: increment(1)
         });
       }
 
@@ -329,24 +330,24 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
       const secureToken = crypto.randomUUID();
       console.log('Creating Firestore document...');
       
-      // Get folio visibility for denormalization
-      let folioVisibility = 'private';
-      let folioPrivacy = 'private';
+      // Get collection visibility for denormalization
+      let collectionVisibility = 'private';
+      let collectionPrivacy = 'private';
       let folioToken = folioMetadata?.shareToken || '';
       
-      if (finalFolioId !== 'loose-leaves') {
-        const folioSnap = await getDoc(doc(db, 'folios', finalFolioId));
-        if (folioSnap.exists()) {
-          const fData = folioSnap.data();
-          folioVisibility = fData.visibility || 'private';
-          folioPrivacy = fData.privacy || 'private';
-          folioToken = fData.folioToken || folioToken;
+      if (finalCollectionId !== 'loose-leaves') {
+        const collectionSnap = await getDoc(doc(db, 'collections', finalCollectionId));
+        if (collectionSnap.exists()) {
+          const cData = collectionSnap.data();
+          collectionVisibility = cData.visibility || 'private';
+          collectionPrivacy = cData.privacy || 'private';
+          folioToken = cData.folioToken || folioToken;
         }
       }
 
       try {
         await addDoc(collection(db, 'postcards'), {
-          folioId: finalFolioId,
+          collectionId: finalCollectionId,
           creatorId: auth.currentUser.uid,
           mediaUrls: downloadUrls,
           caption,
@@ -358,8 +359,8 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           createdAt: serverTimestamp(),
           postcardDate: postcardDate,
           visibilityList: [], 
-          folioVisibility,
-          folioPrivacy,
+          collectionVisibility,
+          collectionPrivacy,
           folioToken,
           profilePrivacy: userStats?.profilePrivacy || 'private'
         });
@@ -370,13 +371,13 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           total_postcard_count: increment(1)
         });
 
-        if (finalFolioId !== 'loose-leaves') {
-          const folioRef = doc(db, 'folios', finalFolioId);
+        if (finalCollectionId !== 'loose-leaves') {
+          const collectionRef = doc(db, 'collections', finalCollectionId);
           const updates: any = {
             postcardCount: increment(1),
             photoCount: increment(downloadUrls.length)
           };
-          await updateDoc(folioRef, updates);
+          await updateDoc(collectionRef, updates);
         }
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, 'postcards');
@@ -523,34 +524,34 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
                   </Button>
                 </div>
 
-                {/* Folio Selection */}
+                {/* Collection Selection */}
                 <div className="space-y-4 p-6 bg-white rounded-xl border border-charcoal/5">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Collection</label>
                     <button 
-                      onClick={() => setIsCreatingNewFolio(!isCreatingNewFolio)}
+                      onClick={() => setIsCreatingNewCollection(!isCreatingNewCollection)}
                       className="text-xs text-sage font-bold uppercase tracking-widest hover:underline"
                     >
-                      {isCreatingNewFolio ? 'Select Existing' : '+ New Collection'}
+                      {isCreatingNewCollection ? 'Select Existing' : '+ New Collection'}
                     </button>
                   </div>
 
-                  {isCreatingNewFolio ? (
+                  {isCreatingNewCollection ? (
                     <input
                       type="text"
-                      value={newFolioTitle}
-                      onChange={(e) => setNewFolioTitle(e.target.value)}
+                      value={newCollectionTitle}
+                      onChange={(e) => setNewCollectionTitle(e.target.value)}
                       placeholder="Enter collection title..."
                       className="w-full p-3 bg-canvas rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all"
                     />
                   ) : (
                     <select
-                      value={selectedFolioId}
-                      onChange={(e) => setSelectedFolioId(e.target.value)}
+                      value={selectedCollectionId}
+                      onChange={(e) => setSelectedCollectionId(e.target.value)}
                       className="w-full p-3 bg-canvas rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all appearance-none"
                     >
                       <option value="loose-leaves">Loose Leaves (Default)</option>
-                      {folios.map(f => (
+                      {collections.map(f => (
                         <option key={f.id} value={f.id}>{f.title}</option>
                       ))}
                     </select>

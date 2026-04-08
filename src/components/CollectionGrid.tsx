@@ -3,13 +3,13 @@ import { Card } from './ui/Card';
 import { Calendar, Image as ImageIcon, MapPin, User, Share2 } from 'lucide-react';
 import { Button } from './ui/Button';
 
-interface Folio {
+interface Collection {
   id: string;
   title: string;
   description: string;
   coverImage: string;
   createdAt: string;
-  folioDate?: string;
+  collectionDate?: string;
   postcardCount: number;
   photoCount?: number;
   location?: string;
@@ -18,16 +18,16 @@ interface Folio {
   privacy?: string;
 }
 
-interface FolioGridProps {
-  folios: Folio[];
+interface CollectionGridProps {
+  collections: Collection[];
   onSelect: (id: string) => void;
-  onShare?: (folio: Folio) => void;
+  onShare?: (collection: Collection) => void;
   showCreator?: boolean;
   isOwner?: boolean;
 }
 
-export const FolioGrid = ({ folios, onSelect, onShare, showCreator = false, isOwner = false }: FolioGridProps) => {
-  const formatFolioDate = (dateStr?: string, createdAt?: string) => {
+export const CollectionGrid = ({ collections, onSelect, onShare, showCreator = false, isOwner = false }: CollectionGridProps) => {
+  const formatCollectionDate = (dateStr?: string, createdAt?: string) => {
     const target = dateStr || createdAt;
     if (!target) return '';
     
@@ -49,30 +49,30 @@ export const FolioGrid = ({ folios, onSelect, onShare, showCreator = false, isOw
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-6">
-      {folios.map((folio, index) => (
+      {collections.map((collection, index) => (
         <motion.div
-          key={folio.id}
+          key={collection.id}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
-          onClick={() => onSelect(folio.id)}
+          onClick={() => onSelect(collection.id)}
           className="cursor-pointer"
         >
           <Card className="h-full flex flex-col">
             <div className="aspect-[4/5] relative overflow-hidden">
               <img
-                src={folio.coverImage}
-                alt={folio.title}
+                src={collection.coverImage}
+                alt={collection.title}
                 className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute top-4 right-4 glass px-3 py-1 rounded-full flex flex-col items-end gap-0.5 text-[10px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <ImageIcon size={12} className="text-sage" />
-                  {folio.photoCount || 0} Photos
+                  {collection.photoCount || 0} Photos
                 </div>
                 <div className="text-[8px] opacity-40">
-                  {folio.postcardCount || 0} Postcards
+                  {collection.postcardCount || 0} Postcards
                 </div>
               </div>
             </div>
@@ -80,23 +80,23 @@ export const FolioGrid = ({ folios, onSelect, onShare, showCreator = false, isOw
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-3xl font-serif tracking-tight leading-tight group-hover:text-sage transition-colors truncate">
-                    {folio.title}
+                    {collection.title}
                   </h3>
-                  {folio.location && (
+                  {collection.location && (
                     <div className="flex items-center gap-1 text-[9px] text-charcoal/30 uppercase font-bold tracking-[0.2em] pt-2">
                       <MapPin size={10} />
-                      {folio.location}
+                      {collection.location}
                     </div>
                   )}
                 </div>
-                {onShare && (isOwner || folio.privacy === 'public') && (
+                {onShare && (isOwner || collection.privacy === 'public') && (
                   <Button 
                     variant="ghost" 
                     size="sm" 
                     className="shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onShare(folio);
+                      onShare(collection);
                     }}
                   >
                     <Share2 size={16} />
@@ -105,16 +105,16 @@ export const FolioGrid = ({ folios, onSelect, onShare, showCreator = false, isOw
               </div>
               
               <p className="text-charcoal/50 text-sm line-clamp-3 italic editorial-text flex-1 leading-relaxed">
-                {folio.description}
+                {collection.description}
               </p>
 
               <div className="pt-4 flex flex-col gap-4">
                 <div className="flex items-center gap-2 text-[10px] text-charcoal/30 uppercase tracking-[0.2em] font-bold">
                   <Calendar size={12} className="text-sage/40" />
-                  {formatFolioDate(folio.folioDate, folio.createdAt)}
+                  {formatCollectionDate(collection.collectionDate, collection.createdAt)}
                 </div>
 
-                {showCreator && (folio.creatorName || folio.creatorUsername) && (
+                {showCreator && (collection.creatorName || collection.creatorUsername) && (
                   <div className="pt-4 border-t border-charcoal/5 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-canvas flex items-center justify-center border border-charcoal/5">
                       <User size={14} className="text-charcoal/20" />
@@ -122,7 +122,7 @@ export const FolioGrid = ({ folios, onSelect, onShare, showCreator = false, isOw
                     <div className="flex flex-col">
                       <span className="text-[8px] font-bold uppercase tracking-widest text-charcoal/20">Curator</span>
                       <span className="text-[10px] font-bold uppercase tracking-widest text-charcoal">
-                        {folio.creatorName || `@${folio.creatorUsername}`}
+                        {collection.creatorName || `@${collection.creatorUsername}`}
                       </span>
                     </div>
                   </div>

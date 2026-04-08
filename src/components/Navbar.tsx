@@ -44,11 +44,11 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate }: NavbarProps) => {
           </Link>
           {user && (
             <Link 
-              to="/map" 
-              className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${location.pathname === '/map' ? 'text-sage' : 'text-charcoal/40 hover:text-charcoal'}`}
-            >
-              <MapPin size={14} /> Memory Map
-            </Link>
+            to="/map" 
+            className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${location.pathname === '/map' ? 'text-sage' : 'text-charcoal/40 hover:text-charcoal'}`}
+          >
+            <MapPin size={14} /> Memory Map
+          </Link>
           )}
         </div>
       </div>
@@ -74,7 +74,7 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate }: NavbarProps) => {
           className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-sage/5 text-sage hover:bg-sage/10 transition-colors text-xs font-bold uppercase tracking-widest"
         >
           <Heart size={14} className="fill-sage/20" />
-          Support Folio
+          Support
         </a>
 
         {user ? (

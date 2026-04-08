@@ -69,7 +69,7 @@ export const ProfilePage = () => {
             follower_count: 0,
             following_count: 0,
             createdAt: new Date().toISOString(),
-            total_folio_count: 0,
+            total_collection_count: 0,
             total_postcard_count: 0
           };
           await setDoc(userRef, initialProfile);
@@ -167,19 +167,19 @@ export const ProfilePage = () => {
           createdAt: profile.createdAt || new Date().toISOString()
         }, { merge: true });
 
-        // Update all folios and postcards with public profile privacy
+        // Update all collections and postcards with public profile privacy
         const { collection, query, where, getDocs, writeBatch } = await import('firebase/firestore');
-        const foliosQuery = query(collection(db, 'folios'), where('creatorId', '==', auth.currentUser.uid));
-        const foliosSnap = await getDocs(foliosQuery);
+        const collectionsQuery = query(collection(db, 'collections'), where('creatorId', '==', auth.currentUser.uid));
+        const collectionsSnap = await getDocs(collectionsQuery);
         
         const postcardsQuery = query(collection(db, 'postcards'), where('creatorId', '==', auth.currentUser.uid));
         const postcardsSnap = await getDocs(postcardsQuery);
 
         const batch = writeBatch(db);
         
-        if (!foliosSnap.empty) {
-          foliosSnap.docs.forEach(fDoc => {
-            batch.update(fDoc.ref, { profilePrivacy: 'public' });
+        if (!collectionsSnap.empty) {
+          collectionsSnap.docs.forEach(cDoc => {
+            batch.update(cDoc.ref, { profilePrivacy: 'public' });
           });
         }
 
@@ -196,20 +196,20 @@ export const ProfilePage = () => {
           const { deleteDoc, collection, query, where, getDocs, writeBatch } = await import('firebase/firestore');
           await deleteDoc(doc(db, 'public_profiles', profile.username));
           
-          // Also update all folios and postcards with the new profile privacy
-          const foliosQuery = query(collection(db, 'folios'), where('creatorId', '==', auth.currentUser.uid));
-          const foliosSnap = await getDocs(foliosQuery);
+          // Also update all collections and postcards with the new profile privacy
+          const collectionsQuery = query(collection(db, 'collections'), where('creatorId', '==', auth.currentUser.uid));
+          const collectionsSnap = await getDocs(collectionsQuery);
           
           const postcardsQuery = query(collection(db, 'postcards'), where('creatorId', '==', auth.currentUser.uid));
           const postcardsSnap = await getDocs(postcardsQuery);
 
           const batch = writeBatch(db);
           
-          if (!foliosSnap.empty) {
-            foliosSnap.docs.forEach(fDoc => {
+          if (!collectionsSnap.empty) {
+            collectionsSnap.docs.forEach(cDoc => {
               const updates: any = { profilePrivacy: 'private' };
               updates.visibility = 'private'; // Profile private = all collections private
-              batch.update(fDoc.ref, updates);
+              batch.update(cDoc.ref, updates);
             });
           }
 
@@ -217,14 +217,14 @@ export const ProfilePage = () => {
             postcardsSnap.docs.forEach(pDoc => {
               batch.update(pDoc.ref, { 
                 profilePrivacy: 'private',
-                folioVisibility: 'private'
+                collectionVisibility: 'private'
               });
             });
           }
 
           await batch.commit();
         } catch (e) {
-          console.warn('Could not delete public profile or update folios:', e);
+          console.warn('Could not delete public profile or update collections:', e);
         }
       }
       
@@ -344,7 +344,7 @@ export const ProfilePage = () => {
           <section className="space-y-6 pt-12 border-t border-charcoal/5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-serif">Folio Privacy</h3>
+                <h3 className="text-xl font-serif">Privacy Settings</h3>
                 <p className="text-sm text-charcoal/60">Control how others discover your profile.</p>
               </div>
             </div>

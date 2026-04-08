@@ -3,11 +3,11 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, Lock, Users, Mail, ShieldCheck, Share2, Check } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, onSnapshot, serverTimestamp, updateDoc, arrayUnion } from 'firebase/firestore';
-import { FolioGrid } from './FolioGrid';
+import { CollectionGrid } from './CollectionGrid';
 import { Button } from './ui/Button';
 import { AnimatePresence, motion } from 'motion/react';
 
-export const FolioView = () => {
+export const CollectionView = () => {
   const { username, shareId } = useParams<{ username: string; shareId?: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -15,7 +15,7 @@ export const FolioView = () => {
   
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [folios, setFolios] = useState<any[]>([]);
+  const [collections, setCollections] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -38,20 +38,20 @@ export const FolioView = () => {
     copyToClipboard(url, 'folio');
   };
 
-  const handleShareCollection = (folio: any) => {
+  const handleShareCollection = (collection: any) => {
     const baseUrl = window.location.origin;
     let shareUrl = '';
     
     // If it's a public collection or has a public link enabled, use the premium public view
-    if ((folio.privacy === 'public' || folio.visibility === 'public') && userProfile?.profilePrivacy === 'public') {
-      shareUrl = `${baseUrl}/s/${folio.id}`;
+    if ((collection.privacy === 'public' || collection.visibility === 'public') && userProfile?.profilePrivacy === 'public') {
+      shareUrl = `${baseUrl}/s/${collection.id}`;
     } 
     // Otherwise, use the private guest view link
     else {
-      shareUrl = `${baseUrl}/v/${folio.id}`;
+      shareUrl = `${baseUrl}/v/${collection.id}`;
     }
 
-    copyToClipboard(shareUrl, folio.id);
+    copyToClipboard(shareUrl, collection.id);
   };
 
   useEffect(() => {
@@ -107,9 +107,6 @@ export const FolioView = () => {
             };
           }
           
-          if (tokenData.userId !== userId) {
-             // This should match if we got userId from tokenData
-          }
           setIsVerified(true);
         } else if (!userData) {
           setError('User not found or profile is private');
@@ -130,7 +127,23 @@ export const FolioView = () => {
         if (shareId) {
           const shareDoc = await getDoc(doc(db, 'shares', shareId));
           if (shareDoc.exists() && shareDoc.data().status === 'active' && shareDoc.data().type === 'folio') {
-            setShareData({ id: shareDoc.id, ...shareDoc.data() });
+            const sData = shareDoc.data();
+            
+            // Check token if present (new style)
+            if (sData.token && sData.token !== token) {
+              setError('Invalid folio link');
+              setLoading(false);
+              return;
+            }
+
+            // Check expiration
+            if (sData.expiresAt && new Date(sData.expiresAt) < new Date()) {
+              setError('Folio invite has expired');
+              setLoading(false);
+              return;
+            }
+
+            setShareData({ id: shareDoc.id, ...sData });
             setLoading(false);
             return;
           } else {
@@ -140,9 +153,9 @@ export const FolioView = () => {
           }
         }
 
-        await fetchFolios(userId, token);
+        await fetchCollections(userId, token);
       } catch (err) {
-        console.error('Error checking folio access:', err);
+        console.error('Error checking collection access:', err);
         setError('Access denied');
         setLoading(false);
       }
@@ -151,30 +164,29 @@ export const FolioView = () => {
     checkAccess();
   }, [username, shareId, token]);
 
-  const fetchFolios = async (userId: string, folioToken?: string | null) => {
+  const fetchCollections = async (userId: string, folioToken?: string | null) => {
     try {
-      const foliosRef = collection(db, 'folios');
-      let foliosQuery;
+      const collectionsRef = collection(db, 'collections');
+      let collectionsQuery;
       
       const isPrivateInvite = !!shareId;
-      const isPublicFolioLink = !!folioToken;
 
       if (isPrivateInvite) {
         // Private invite: Can see Public + Private (not Personal)
-        foliosQuery = query(
-          foliosRef, 
+        collectionsQuery = query(
+          collectionsRef, 
           where('creatorId', '==', userId)
         );
       } else {
         // Public link or just profile: All collections (we filter in memory)
-        foliosQuery = query(
-          foliosRef, 
+        collectionsQuery = query(
+          collectionsRef, 
           where('creatorId', '==', userId)
         );
       }
 
-      const foliosSnapshot = await getDocs(foliosQuery);
-      const fetchedFolios = foliosSnapshot.docs
+      const collectionsSnapshot = await getDocs(collectionsQuery);
+      const fetchedCollections = collectionsSnapshot.docs
         .map(doc => ({ id: doc.id, ...(doc.data() as any) }))
         .filter((f: any) => {
           if (isPrivateInvite) {
@@ -185,10 +197,10 @@ export const FolioView = () => {
           return f.privacy === 'public' || f.visibility === 'public';
         });
 
-      setFolios(fetchedFolios);
+      setCollections(fetchedCollections);
       setLoading(false);
     } catch (err) {
-      console.error('Error fetching folios:', err);
+      console.error('Error fetching collections:', err);
       setError('Access denied or collection not found');
       setLoading(false);
     }
@@ -212,7 +224,7 @@ export const FolioView = () => {
     setTimeout(async () => {
       if (otp === '123456' || email === shareData?.email) {
         setIsVerified(true);
-        await fetchFolios(userProfile.id);
+        await fetchCollections(userProfile.id);
         // Track access
         await updateDoc(doc(db, 'shares', shareData.id), {
           accessedBy: arrayUnion(email)
@@ -259,9 +271,9 @@ export const FolioView = () => {
           </div>
           
           <div className="space-y-2">
-            <h2 className="text-3xl font-serif">Folio Guest Pass</h2>
+            <h2 className="text-3xl font-serif">Guest Pass</h2>
             <p className="text-sm text-charcoal/60 italic">
-              Verification required to view <span className="font-bold text-charcoal not-italic">{userProfile?.displayName}'s Folio</span>
+              Verification required to view <span className="font-bold text-charcoal not-italic">{userProfile?.displayName}'s Collections</span>
             </p>
           </div>
 
@@ -335,7 +347,7 @@ export const FolioView = () => {
           </AnimatePresence>
 
           <p className="text-[10px] text-charcoal/30 uppercase tracking-[0.2em] font-bold">
-            Secure Private Link &bull; Folio Guest Pass
+            Secure Private Link &bull; Collection Guest Pass
           </p>
         </motion.div>
       </div>
@@ -372,7 +384,7 @@ export const FolioView = () => {
             <div className="flex-1 text-center md:text-left space-y-4">
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="space-y-1">
-                  <h1 className="text-4xl md:text-5xl font-serif">{userProfile.displayName}'s Folio</h1>
+                  <h1 className="text-4xl md:text-5xl font-serif">{userProfile.displayName}'s Collections</h1>
                   <p className="text-sage font-bold tracking-widest text-sm uppercase">Shared Access View</p>
                 </div>
                 {userProfile.profilePrivacy === 'public' && (
@@ -391,7 +403,7 @@ export const FolioView = () => {
               <div className="flex flex-wrap justify-center md:justify-start gap-6 pt-2">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
                   <Users size={14} className="text-sage" />
-                  {folios.length} Shared Collections
+                  {collections.length} Shared Collections
                 </div>
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
                   <Calendar size={14} className="text-sage" />
@@ -410,16 +422,16 @@ export const FolioView = () => {
           <div className="w-12 h-px bg-sage/20 mx-auto" />
         </div>
 
-        {folios.length === 0 ? (
+        {collections.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-charcoal/10">
-            <p className="text-charcoal/40 italic">No collections available in this folio.</p>
+            <p className="text-charcoal/40 italic">No collections available.</p>
           </div>
         ) : (
-          <FolioGrid 
-            folios={folios} 
+          <CollectionGrid 
+            collections={collections} 
             onSelect={(id) => {
-              const folio = folios.find(f => f.id === id);
-              if (folio?.privacy === 'public' || folio?.visibility === 'public') {
+              const collection = collections.find(f => f.id === id);
+              if (collection?.privacy === 'public' || collection?.visibility === 'public') {
                 navigate(`/s/${id}`);
               } else {
                 navigate(`/v/${id}${token ? `?folioToken=${token}` : ''}`);
@@ -432,7 +444,7 @@ export const FolioView = () => {
 
       <footer className="py-12 border-t border-charcoal/5 text-center">
         <div className="text-charcoal/30 text-xs uppercase tracking-widest font-bold">
-          Shared Folio Access &mdash; Powered by Folio
+          Shared Access &mdash; Powered by Folio
         </div>
       </footer>
     </div>

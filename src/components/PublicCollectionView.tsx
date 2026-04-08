@@ -7,12 +7,12 @@ import { motion } from 'motion/react';
 import { Globe, ArrowLeft, Share2, Check } from 'lucide-react';
 import { Button } from './ui/Button';
 
-export const PublicFolioView = () => {
-  const { folioId } = useParams<{ folioId: string }>();
+export const PublicCollectionView = () => {
+  const { collectionId } = useParams<{ collectionId: string }>();
   const [searchParams] = useSearchParams();
   const postcardId = searchParams.get('postcardId');
   const [postcards, setPostcards] = useState<any[]>([]);
-  const [folio, setFolio] = useState<any>(null);
+  const [collectionData, setCollectionData] = useState<any>(null);
   const [creator, setCreator] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -26,20 +26,20 @@ export const PublicFolioView = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!folioId) return;
+      if (!collectionId) return;
 
       try {
-        const folioDoc = await getDoc(doc(db, 'folios', folioId));
-        if (!folioDoc.exists()) {
+        const collectionDoc = await getDoc(doc(db, 'collections', collectionId));
+        if (!collectionDoc.exists()) {
           setError(true);
           setLoading(false);
           return;
         }
 
-        const folioData = folioDoc.data();
+        const data = collectionDoc.data();
         
-        // Access Control: Public Folio View requires (public collection OR public link enabled)
-        const isPublicCollection = folioData.privacy === 'public' || folioData.visibility === 'public';
+        // Access Control: Public Collection View requires (public collection OR public link enabled)
+        const isPublicCollection = data.privacy === 'public' || data.visibility === 'public';
 
         if (!isPublicCollection) {
           setError(true);
@@ -50,30 +50,31 @@ export const PublicFolioView = () => {
         // Fetch Creator Data (Optional, might fail if profile is private)
         let creatorData = null;
         try {
-          const creatorDoc = await getDoc(doc(db, 'users', folioData.creatorId));
+          const creatorDoc = await getDoc(doc(db, 'users', data.creatorId));
           creatorData = creatorDoc.exists() ? creatorDoc.data() : null;
         } catch (e) {
           console.warn('Could not fetch creator data (profile might be private):', e);
         }
 
         // If profile is private, we must ensure the collection is indeed public
-        // (The rules already enforce this for the folioDoc fetch, but we check again for safety)
         if (!creatorData || creatorData.profilePrivacy !== 'public') {
           // Use denormalized data if profile is private
           creatorData = {
-            displayName: folioData.creatorName || 'Curator',
-            username: folioData.creatorUsername || '',
+            displayName: data.creatorName || 'Curator',
+            username: data.creatorUsername || '',
             profilePrivacy: 'private'
           };
         }
 
-        setFolio(folioData);
+        setCollectionData(data);
         setCreator(creatorData);
 
         // Fetch Postcards
         const q = query(
           collection(db, 'postcards'),
-          where('folioId', '==', folioId),
+          where('collectionId', '==', collectionId),
+          where('collectionVisibility', '==', 'public'),
+          where('profilePrivacy', '==', 'public'),
           orderBy('createdAt', 'desc')
         );
         
@@ -86,18 +87,18 @@ export const PublicFolioView = () => {
         setPostcards(docs);
 
         // Update Meta Tags for SEO/Social Preview
-        document.title = `${folioData.title} | Folio`;
+        document.title = `${data.title} | Folio`;
         const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc) metaDesc.setAttribute('content', folioData.description || 'A curated collection of digital postcards.');
+        if (metaDesc) metaDesc.setAttribute('content', data.description || 'A curated collection of digital postcards.');
         
         // OpenGraph
         const ogTitle = document.querySelector('meta[property="og:title"]');
-        if (ogTitle) ogTitle.setAttribute('content', folioData.title);
+        if (ogTitle) ogTitle.setAttribute('content', data.title);
         const ogImage = document.querySelector('meta[property="og:image"]');
-        if (ogImage) ogImage.setAttribute('content', folioData.coverImage || '');
+        if (ogImage) ogImage.setAttribute('content', data.coverImage || '');
 
       } catch (err) {
-        console.error('Error fetching public folio:', err);
+        console.error('Error fetching public collection:', err);
         setError(true);
       } finally {
         setLoading(false);
@@ -105,7 +106,7 @@ export const PublicFolioView = () => {
     };
 
     fetchData();
-  }, [folioId]);
+  }, [collectionId]);
 
   useEffect(() => {
     if (!loading && postcardId && postcards.length > 0) {
@@ -150,7 +151,7 @@ export const PublicFolioView = () => {
       {/* Premium Editorial Header */}
       <div className="relative h-[70vh] w-full overflow-hidden">
         <img 
-          src={folio?.coverImage || 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&q=80&w=1920'} 
+          src={collectionData?.coverImage || 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&q=80&w=1920'} 
           alt="" 
           className="w-full h-full object-cover"
           referrerPolicy="no-referrer"
@@ -169,10 +170,10 @@ export const PublicFolioView = () => {
               <div className="w-12 h-px bg-charcoal/20" />
             </div>
             <h1 className="text-6xl md:text-8xl font-serif tracking-tight text-charcoal leading-none">
-              {folio?.title}
+              {collectionData?.title}
             </h1>
             <p className="text-xl md:text-2xl text-charcoal/70 italic font-serif max-w-2xl mx-auto">
-              {folio?.description}
+              {collectionData?.description}
             </p>
             <div className="flex items-center justify-center gap-6 pt-8">
               <div className="flex items-center gap-3">
@@ -217,8 +218,8 @@ export const PublicFolioView = () => {
             <Postcard 
               {...postcard}
               isPremium={creator?.isPremium || creator?.role === 'admin'}
-              folioPrivacy={folio?.privacy}
-              folioVisibility={folio?.visibility}
+              collectionPrivacy={collectionData?.privacy}
+              collectionVisibility={collectionData?.visibility}
               profilePrivacy={creator?.profilePrivacy}
             />
           </motion.div>
