@@ -466,6 +466,7 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
                 type="text"
                 required
                 value={username}
+                maxLength={30}
                 onChange={(e) => setUsername(e.target.value.replace(/[^a-z0-9_]/gi, '').toLowerCase())}
                 placeholder="janedoe"
                 className="w-full py-3 pl-10 pr-4 bg-white rounded-xl border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all text-sm"

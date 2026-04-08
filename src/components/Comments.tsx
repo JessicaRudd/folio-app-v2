@@ -4,6 +4,7 @@ import { X, Send, Loader2, User } from 'lucide-react';
 import { Button } from './ui/Button';
 import { socialService } from '../services/socialService';
 import { auth } from '../lib/firebase';
+import { TruncatedText } from './ui/TruncatedText';
 
 interface CommentsProps {
   postcardId: string;
@@ -97,7 +98,7 @@ export const Comments = ({ postcardId, creatorId, onClose }: CommentsProps) => {
                     {new Date(comment.createdAt?.toDate?.() || comment.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                <p className="text-sm text-charcoal/80 leading-relaxed">{comment.text}</p>
+                <TruncatedText text={comment.text} className="text-sm text-charcoal/80 leading-relaxed" />
               </div>
             </div>
           ))
@@ -109,6 +110,7 @@ export const Comments = ({ postcardId, creatorId, onClose }: CommentsProps) => {
           <input
             type="text"
             value={newComment}
+            maxLength={2000}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder={auth.currentUser ? "Add a comment..." : "Login to comment"}
             disabled={!auth.currentUser || submitting}

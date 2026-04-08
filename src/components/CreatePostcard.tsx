@@ -564,6 +564,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
                     <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Diary Entry</label>
                     <textarea
                       value={caption}
+                      maxLength={2000}
                       onChange={(e) => setCaption(e.target.value)}
                       placeholder="Write your story..."
                       className="w-full h-32 p-4 bg-white rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 focus:border-sage outline-none transition-all editorial-text resize-none"

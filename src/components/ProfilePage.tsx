@@ -322,6 +322,7 @@ export const ProfilePage = () => {
                   <input
                     type="text"
                     value={profile.username}
+                    maxLength={30}
                     onChange={(e) => setProfile({ ...profile, username: e.target.value })}
                     className="w-full p-3 pl-8 bg-white rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all"
                     placeholder="username"
@@ -334,6 +335,7 @@ export const ProfilePage = () => {
               <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Bio</label>
               <textarea
                 value={profile.bio}
+                maxLength={150}
                 onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
                 className="w-full h-32 p-4 bg-white rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all resize-none editorial-text"
                 placeholder="Tell your story..."

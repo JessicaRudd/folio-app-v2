@@ -7,6 +7,9 @@ import { socialService } from '../services/socialService';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Comments } from './Comments';
+import { TruncatedText } from './ui/TruncatedText';
+import { EditPostcard } from './EditPostcard';
+import { Edit2 } from 'lucide-react';
 
 interface PostcardProps {
   key?: string;
@@ -50,6 +53,7 @@ export const Postcard = ({
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPhotoDeleteConfirm, setShowPhotoDeleteConfirm] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [localMediaUrls, setLocalMediaUrls] = useState(mediaUrls);
 
@@ -294,21 +298,32 @@ export const Postcard = ({
               </Button>
             )}
             {isOwner && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="rounded-full p-2 text-charcoal/40 hover:text-red-600"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 size={20} />
-              </Button>
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="rounded-full p-2 text-charcoal/40 hover:text-sage"
+                  onClick={() => setShowEditModal(true)}
+                >
+                  <Edit2 size={20} />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="rounded-full p-2 text-charcoal/40 hover:text-red-600"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 size={20} />
+                </Button>
+              </>
             )}
           </div>
         </div>
 
-        <div className="editorial-text border-l-2 border-sage/20 pl-6 py-2">
-          {caption}
-        </div>
+        <TruncatedText 
+          text={caption} 
+          className="editorial-text border-l-2 border-sage/20 pl-6 py-2" 
+        />
 
         <AnimatePresence>
           {showComments && (
@@ -316,6 +331,24 @@ export const Postcard = ({
               postcardId={id} 
               creatorId={creatorId} 
               onClose={() => setShowComments(false)} 
+            />
+          )}
+          {showEditModal && (
+            <EditPostcard
+              postcard={{
+                id,
+                caption,
+                location,
+                mediaUrls: localMediaUrls,
+                postcardDate: date,
+                musicTrack,
+                collectionId
+              }}
+              onClose={() => setShowEditModal(false)}
+              onSuccess={() => {
+                setShowEditModal(false);
+                // The parent component or onSnapshot will handle the update
+              }}
             />
           )}
         </AnimatePresence>
