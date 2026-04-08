@@ -47,6 +47,10 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          # Delete the existing service to clear out any zombie containers from previous failed deployments
+          # This ensures we start fresh with only the 'web' and 'image-proc' containers
+          gcloud run services delete ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --quiet || true
+
           gcloud beta run deploy ${{ env.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
             --allow-unauthenticated \
