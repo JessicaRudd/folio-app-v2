@@ -59,6 +59,8 @@ export const Explore = () => {
         const foliosQuery = query(
           foliosRef,
           where('privacy', '==', 'public'),
+          where('visibility', '==', 'public'),
+          where('profilePrivacy', '==', 'public'),
           limit(20)
         );
         
@@ -89,6 +91,7 @@ export const Explore = () => {
         const publicPostcardsQuery = query(
           collection(db, 'postcards'),
           where('folioVisibility', '==', 'public'),
+          where('profilePrivacy', '==', 'public'),
           orderBy('createdAt', 'desc'),
           limit(20)
         );
@@ -120,6 +123,7 @@ export const Explore = () => {
               const q = query(
                 collection(db, 'postcards'),
                 where('creatorId', 'in', chunk),
+                where('folioVisibility', '==', 'public'),
                 orderBy('createdAt', 'desc'),
                 limit(10)
               );
@@ -335,7 +339,7 @@ export const Explore = () => {
               <div className="flex items-baseline justify-between border-b border-charcoal/5 pb-4">
                 <h2 className="text-xs font-bold uppercase tracking-[0.3em] text-charcoal/30">Public Collections</h2>
                 <div className="text-[10px] font-bold uppercase tracking-widest text-charcoal/20">
-                  {filteredFolios.length} Folios Found
+                  {filteredFolios.length} Collections Found
                 </div>
               </div>
 
@@ -347,7 +351,12 @@ export const Explore = () => {
               ) : (
                 <FolioGrid 
                   folios={filteredFolios} 
-                  onSelect={(id) => navigate(`/v/${id}/public`)} 
+                  onSelect={(id) => navigate(`/s/${id}`)} 
+                  onShare={(folio) => {
+                    const url = `${window.location.origin}/s/${folio.id}`;
+                    navigator.clipboard.writeText(url);
+                    alert('Link copied to clipboard!');
+                  }}
                   showCreator={true}
                 />
               )}
@@ -376,6 +385,9 @@ export const Explore = () => {
                       date={postcard.date}
                       musicTrack={postcard.musicTrack}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
+                      folioPrivacy={postcard.folioPrivacy || 'public'}
+                      folioVisibility={postcard.folioVisibility || 'public'}
+                      profilePrivacy={postcard.profilePrivacy || 'public'}
                     />
                   ))}
                 </div>
@@ -405,6 +417,9 @@ export const Explore = () => {
                       date={postcard.date}
                       musicTrack={postcard.musicTrack}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
+                      folioPrivacy={postcard.folioPrivacy || 'public'}
+                      folioVisibility={postcard.folioVisibility || 'public'}
+                      profilePrivacy={postcard.profilePrivacy || 'public'}
                     />
                   ))}
                 </div>

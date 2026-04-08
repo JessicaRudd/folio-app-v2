@@ -166,6 +166,66 @@ export const ProfilePage = () => {
           following_count: profile.following_count || 0,
           createdAt: profile.createdAt || new Date().toISOString()
         }, { merge: true });
+
+        // Update all folios and postcards with public profile privacy
+        const { collection, query, where, getDocs, writeBatch } = await import('firebase/firestore');
+        const foliosQuery = query(collection(db, 'folios'), where('creatorId', '==', auth.currentUser.uid));
+        const foliosSnap = await getDocs(foliosQuery);
+        
+        const postcardsQuery = query(collection(db, 'postcards'), where('creatorId', '==', auth.currentUser.uid));
+        const postcardsSnap = await getDocs(postcardsQuery);
+
+        const batch = writeBatch(db);
+        
+        if (!foliosSnap.empty) {
+          foliosSnap.docs.forEach(fDoc => {
+            batch.update(fDoc.ref, { profilePrivacy: 'public' });
+          });
+        }
+
+        if (!postcardsSnap.empty) {
+          postcardsSnap.docs.forEach(pDoc => {
+            batch.update(pDoc.ref, { profilePrivacy: 'public' });
+          });
+        }
+
+        await batch.commit();
+      } else if (profile.profilePrivacy === 'private' && profile.username) {
+        // Remove from public profiles if it exists
+        try {
+          const { deleteDoc, collection, query, where, getDocs, writeBatch } = await import('firebase/firestore');
+          await deleteDoc(doc(db, 'public_profiles', profile.username));
+          
+          // Also update all folios and postcards with the new profile privacy
+          const foliosQuery = query(collection(db, 'folios'), where('creatorId', '==', auth.currentUser.uid));
+          const foliosSnap = await getDocs(foliosQuery);
+          
+          const postcardsQuery = query(collection(db, 'postcards'), where('creatorId', '==', auth.currentUser.uid));
+          const postcardsSnap = await getDocs(postcardsQuery);
+
+          const batch = writeBatch(db);
+          
+          if (!foliosSnap.empty) {
+            foliosSnap.docs.forEach(fDoc => {
+              const updates: any = { profilePrivacy: 'private' };
+              updates.visibility = 'private'; // Profile private = all collections private
+              batch.update(fDoc.ref, updates);
+            });
+          }
+
+          if (!postcardsSnap.empty) {
+            postcardsSnap.docs.forEach(pDoc => {
+              batch.update(pDoc.ref, { 
+                profilePrivacy: 'private',
+                folioVisibility: 'private'
+              });
+            });
+          }
+
+          await batch.commit();
+        } catch (e) {
+          console.warn('Could not delete public profile or update folios:', e);
+        }
       }
       
       setProfile(prev => ({ ...prev, photoURL }));

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus } from 'lucide-react';
+import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus, Share2, Check } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { FolioGrid } from './FolioGrid';
@@ -19,6 +19,22 @@ export const PublicProfile = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleShareProfile = () => {
+    copyToClipboard(window.location.href, 'profile');
+  };
+
+  const handleShareCollection = (folio: any) => {
+    const url = `${window.location.origin}/s/${folio.id}`;
+    copyToClipboard(url, folio.id);
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -66,7 +82,7 @@ export const PublicProfile = () => {
         const foliosQuery = query(
           foliosRef, 
           where('creatorId', '==', userId),
-          where('privacy', '==', 'public')
+          where('visibility', '==', 'public')
         );
         const foliosSnapshot = await getDocs(foliosQuery);
         const folios = foliosSnapshot.docs.map(doc => ({
@@ -153,24 +169,36 @@ export const PublicProfile = () => {
           Back to Explore
         </Button>
 
-        {currentUser && userProfile && currentUser.uid !== userProfile.id && (
+        <div className="flex items-center gap-3">
           <Button
-            variant={isFollowing ? "outline" : "primary"}
+            variant="outline"
             size="sm"
-            onClick={handleFollow}
-            disabled={followLoading}
+            onClick={handleShareProfile}
             className="gap-2"
           >
-            {followLoading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : isFollowing ? (
-              <UserMinus size={16} />
-            ) : (
-              <UserPlus size={16} />
-            )}
-            {isFollowing ? 'Following' : 'Follow Curator'}
+            {copied === 'profile' ? <Check size={16} className="text-sage" /> : <Share2 size={16} />}
+            {copied === 'profile' ? 'Link Copied' : 'Share Profile'}
           </Button>
-        )}
+
+          {currentUser && userProfile && currentUser.uid !== userProfile.id && (
+            <Button
+              variant={isFollowing ? "outline" : "primary"}
+              size="sm"
+              onClick={handleFollow}
+              disabled={followLoading}
+              className="gap-2"
+            >
+              {followLoading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : isFollowing ? (
+                <UserMinus size={16} />
+              ) : (
+                <UserPlus size={16} />
+              )}
+              {isFollowing ? 'Following' : 'Follow Curator'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Profile Header */}
@@ -202,7 +230,7 @@ export const PublicProfile = () => {
               <div className="flex flex-wrap justify-center md:justify-start gap-6 pt-2">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
                   <Globe size={14} className="text-sage" />
-                  {publicFolios.length} Public Folios
+                  {publicFolios.length} Public Collections
                 </div>
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
                   <User size={14} className="text-sage" />
@@ -237,10 +265,9 @@ export const PublicProfile = () => {
           <FolioGrid 
             folios={publicFolios} 
             onSelect={(id) => {
-              // For public profiles, we might want a different view or just link to guest view
-              // For now, let's assume we can navigate to a public view of the folio
               navigate(`/v/${id}/public`);
             }} 
+            onShare={handleShareCollection}
           />
         )}
       </main>

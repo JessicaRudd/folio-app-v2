@@ -22,6 +22,7 @@ interface EditFolioProps {
     photoCount?: number;
     creatorName?: string;
     creatorUsername?: string;
+    folioToken?: string;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -48,6 +49,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [postcards, setPostcards] = useState<any[]>([]);
+  const [folioMetadata, setFolioMetadata] = useState<any>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -58,6 +60,12 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
       const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
       if (userDoc.exists()) {
         setUserProfile(userDoc.data());
+      }
+
+      // Fetch Folio Metadata
+      const metaDoc = await getDoc(doc(db, 'folio_metadata', auth.currentUser.uid));
+      if (metaDoc.exists()) {
+        setFolioMetadata(metaDoc.data());
       }
 
       // Fetch postcards to get photos for cover selection
@@ -288,6 +296,9 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
       }
 
       const folioRef = doc(db, 'folios', folio.id);
+      const currentFolioToken = folioMetadata?.shareToken || '';
+      const newVisibility = privacy === 'public' ? 'public' : 'private';
+      
       await updateDoc(folioRef, {
         title,
         description,
@@ -295,17 +306,19 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
         folioDate,
         coverImage: finalCoverUrl,
         privacy,
-        visibility,
+        visibility: newVisibility,
         allowedUsers: privacy === 'personal' ? allowedUsers : [],
+        folioToken: currentFolioToken
       });
 
       // Update denormalized fields in postcards
-      if (privacy !== folio.privacy || visibility !== folio.visibility) {
+      if (privacy !== folio.privacy || newVisibility !== folio.visibility || currentFolioToken !== folio.folioToken) {
         const batch = writeBatch(db);
         postcards.forEach(p => {
           batch.update(doc(db, 'postcards', p.id), {
             folioPrivacy: privacy,
-            folioVisibility: visibility
+            folioVisibility: newVisibility,
+            folioToken: currentFolioToken
           });
         });
         await batch.commit();
@@ -563,7 +576,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
                 <Lock size={18} className={privacy === 'private' ? "text-sage" : "text-charcoal/40"} />
                 <div>
                   <div className="text-sm font-bold">Private</div>
-                  <div className="text-[10px] text-charcoal/40">Visible with Folio link</div>
+                  <div className="text-[10px] text-charcoal/40">Visible with Collection link</div>
                 </div>
               </button>
 

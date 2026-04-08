@@ -19,7 +19,8 @@
         "total_postcard_count": { "type": "number" },
         "monthly_postcard_count": { "type": "number" },
         "follower_count": { "type": "number" },
-        "following_count": { "type": "number" }
+        "following_count": { "type": "number" },
+        "folioShareToken": { "type": "string" }
       },
       "required": ["uid", "email"]
     },
@@ -104,32 +105,56 @@
         "coverImage": { "type": "string", "format": "uri" },
         "visibility": { "type": "string", "enum": ["private", "public"] },
         "privacy": { "type": "string", "enum": ["private", "personal", "public"] },
-        "curators": { "type": "array", "items": { "type": "string" } },
+        "curators": { "type": "object", "additionalProperties": { "type": "string", "enum": ["viewer", "editor"] } },
         "allowedUsers": { "type": "array", "items": { "type": "string" } },
         "folioDate": { "type": "string", "format": "date" },
         "createdAt": { "type": "string", "format": "date-time" },
         "postcardCount": { "type": "number" },
         "photoCount": { "type": "number" },
         "creatorName": { "type": "string" },
-        "creatorUsername": { "type": "string" }
+        "creatorUsername": { "type": "string" },
+        "folioToken": { "type": "string" }
       },
       "required": ["id", "creatorId", "title"]
     },
+    "FolioMetadata": {
+      "title": "FolioMetadata",
+      "description": "Metadata for a user's entire folio",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "shareToken": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "shareToken"]
+    },
+    "FolioToken": {
+      "title": "FolioToken",
+      "description": "A mapping from share token to userId for secure lookup",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId"]
+    },
     "Share": {
       "title": "Share",
-      "description": "An access key for a Folio",
+      "description": "An access key for a Folio or User Folio",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "folioId": { "type": "string" },
-        "type": { "type": "string", "enum": ["guest", "curator"] },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "type": { "type": "string", "enum": ["guest", "curator", "folio"] },
         "email": { "type": "string", "format": "email" },
         "phone": { "type": "string" },
         "status": { "type": "string", "enum": ["active", "revoked"] },
         "accessedBy": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "folioId", "type", "status"]
+      "required": ["id", "type", "status"]
     },
     "Postcard": {
       "title": "Postcard",
@@ -141,7 +166,7 @@
         "creatorId": { "type": "string" },
         "mediaUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
         "caption": { "type": "string" },
-        "musicTrackId": { "type": "string" },
+        "musicTrack": { "type": "string" },
         "visibilityList": { "type": "array", "items": { "type": "string" } },
         "secureToken": { "type": "string" },
         "lat": { "type": "number" },
@@ -149,7 +174,8 @@
         "postcardDate": { "type": "string", "format": "date" },
         "createdAt": { "type": "string", "format": "date-time" },
         "folioVisibility": { "type": "string", "enum": ["private", "public"] },
-        "folioPrivacy": { "type": "string", "enum": ["private", "personal", "public"] }
+        "folioPrivacy": { "type": "string", "enum": ["private", "personal", "public"] },
+        "folioToken": { "type": "string" }
       },
       "required": ["id", "folioId", "creatorId", "mediaUrls", "secureToken"]
     }
@@ -182,6 +208,10 @@
     "/folios/{folioId}": {
       "schema": "Folio",
       "description": "Folio collections"
+    },
+    "/folio_metadata/{userId}": {
+      "schema": "FolioMetadata",
+      "description": "Folio-wide metadata and share tokens"
     },
     "/postcards/{postcardId}": {
       "schema": "Postcard",

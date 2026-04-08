@@ -249,9 +249,9 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
             <Globe size={24} />
           </div>
           <div className="space-y-1">
-            <h4 className="font-bold text-charcoal">Curated Folios</h4>
+            <h4 className="font-bold text-charcoal">Curated Collections</h4>
             <p className="text-charcoal/60 text-sm leading-relaxed">
-              Organize your postcards into beautiful collections called Folios. Tell a story across multiple moments.
+              Organize your postcards into beautiful collections. Tell a story across multiple moments.
             </p>
           </div>
         </div>

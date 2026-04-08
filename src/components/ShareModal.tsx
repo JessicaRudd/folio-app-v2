@@ -15,7 +15,7 @@ import {
   Users
 } from 'lucide-react';
 import { Button } from './ui/Button';
-import { db, auth } from '../lib/firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   doc, 
   updateDoc, 
@@ -27,7 +27,10 @@ import {
   deleteDoc,
   serverTimestamp,
   getDocs,
-  getDoc
+  getDoc,
+  setDoc,
+  writeBatch,
+  deleteField
 } from 'firebase/firestore';
 import { cn } from '../lib/utils';
 
@@ -43,6 +46,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
   const [shares, setShares] = useState<any[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteType, setInviteType] = useState<'guest' | 'curator'>('guest');
+  const [inviteRole, setInviteRole] = useState<'viewer' | 'editor'>('viewer');
 
   const publicUrl = `${window.location.origin}/s/${folio.id}`;
 
@@ -52,35 +56,49 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
       where('folioId', '==', folio.id)
     );
 
-    return onSnapshot(q, (snapshot) => {
+    const unsubShares = onSnapshot(q, (snapshot) => {
       setShares(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+
+    return () => {
+      unsubShares();
+    };
   }, [folio.id]);
 
   const togglePublic = async () => {
+    // Check if profile is public first
+    const userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
+    const userData = userDoc.data();
+    
+    if (folio.visibility !== 'public' && userData?.profilePrivacy !== 'public') {
+      alert('You must set your profile to "Public" in settings before enabling a public link.');
+      return;
+    }
+
     setLoading(true);
     try {
       const newVisibility = folio.visibility === 'public' ? 'private' : 'public';
-      await updateDoc(doc(db, 'folios', folio.id), {
+      const batch = writeBatch(db);
+      
+      // 1. Update Folio
+      batch.update(doc(db, 'folios', folio.id), {
         visibility: newVisibility
       });
-
-      // Update denormalized fields in postcards
+      
+      // 2. Update Postcards
       const postcardsQuery = query(collection(db, 'postcards'), where('folioId', '==', folio.id));
       const postcardsSnap = await getDocs(postcardsQuery);
       
-      if (!postcardsSnap.empty) {
-        const { writeBatch } = await import('firebase/firestore');
-        const batch = writeBatch(db);
-        postcardsSnap.docs.forEach(p => {
-          batch.update(p.ref, {
-            folioVisibility: newVisibility
-          });
+      postcardsSnap.docs.forEach(p => {
+        batch.update(p.ref, {
+          folioVisibility: newVisibility
         });
-        await batch.commit();
-      }
-    } catch (err) {
+      });
+
+      await batch.commit();
+    } catch (err: any) {
       console.error('Error toggling visibility:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `folios/${folio.id}`);
     } finally {
       setLoading(false);
     }
@@ -107,12 +125,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
         }
 
         const targetUid = userSnap.docs[0].id;
-        const currentCurators = folio.curators || [];
-        if (!currentCurators.includes(targetUid)) {
-          await updateDoc(doc(db, 'folios', folio.id), {
-            curators: [...currentCurators, targetUid]
-          });
-        }
+        const currentCurators = folio.curators || {};
+        await updateDoc(doc(db, 'folios', folio.id), {
+          [`curators.${targetUid}`]: inviteRole
+        });
       } else {
         // Create Guest Share
         await addDoc(collection(db, 'shares'), {
@@ -142,9 +158,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
 
   const removeCurator = async (uid: string) => {
     try {
-      const currentCurators = folio.curators || [];
+      const { deleteField } = await import('firebase/firestore');
       await updateDoc(doc(db, 'folios', folio.id), {
-        curators: currentCurators.filter((id: string) => id !== uid)
+        [`curators.${uid}`]: deleteField()
       });
     } catch (err) {
       console.error('Error removing curator:', err);
@@ -175,13 +191,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
             </button>
           </div>
 
-          <div className="flex gap-1 p-1 bg-canvas rounded-xl">
+          <div className="flex gap-1 p-1 bg-canvas rounded-xl overflow-x-auto no-scrollbar">
             {(['public', 'private', 'curators'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "flex-1 py-2 text-xs font-bold uppercase tracking-widest rounded-lg transition-all",
+                  "flex-1 py-2 px-3 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all whitespace-nowrap",
                   activeTab === tab ? "bg-white text-sage shadow-sm" : "text-charcoal/40 hover:text-charcoal"
                 )}
               >
@@ -336,34 +352,53 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
                 className="space-y-6"
               >
                 <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30" size={18} />
-                      <input 
-                        type="email"
-                        placeholder="curator@folio.com"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-canvas rounded-xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all"
-                      />
+                  <div className="flex flex-col gap-3">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30" size={18} />
+                        <input 
+                          type="email"
+                          placeholder="curator@folio.com"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 bg-canvas rounded-xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all"
+                        />
+                      </div>
+                      <Button 
+                        variant="primary" 
+                        onClick={() => {
+                          setInviteType('curator');
+                          createShare();
+                        }}
+                        disabled={loading || !inviteEmail}
+                      >
+                        {loading ? <Loader2 className="animate-spin" size={18} /> : 'Add'}
+                      </Button>
                     </div>
-                    <Button 
-                      variant="primary" 
-                      onClick={() => {
-                        setInviteType('curator');
-                        createShare();
-                      }}
-                      disabled={loading || !inviteEmail}
-                    >
-                      {loading ? <Loader2 className="animate-spin" size={18} /> : 'Add'}
-                    </Button>
+                    
+                    <div className="flex gap-2 p-1 bg-canvas rounded-lg">
+                      {(['viewer', 'editor'] as const).map((role) => (
+                        <button
+                          key={role}
+                          onClick={() => setInviteRole(role)}
+                          className={cn(
+                            "flex-1 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-md transition-all",
+                            inviteRole === role ? "bg-white text-sage shadow-sm" : "text-charcoal/40 hover:text-charcoal"
+                          )}
+                        >
+                          {role}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <p className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold text-center">
-                    Full edit & share rights for registered users
+                    {inviteRole === 'editor' 
+                      ? 'Can add/delete their own photos' 
+                      : 'View only access to this collection'}
                   </p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                   <h3 className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Active Curators</h3>
                   <div className="space-y-2">
                     {/* Owner */}
@@ -380,8 +415,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
                     </div>
 
                     {/* Other Curators */}
-                    {(folio.curators || []).map((uid: string) => (
-                      <CuratorItem key={uid} uid={uid} onRemove={() => removeCurator(uid)} />
+                    {Object.entries(folio.curators || {}).map(([uid, role]: [string, any]) => (
+                      <CuratorItem key={uid} uid={uid} role={role} onRemove={() => removeCurator(uid)} />
                     ))}
                   </div>
                 </div>
@@ -396,10 +431,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
 
 interface CuratorItemProps {
   uid: string;
+  role: string;
   onRemove: () => void;
 }
 
-const CuratorItem: React.FC<CuratorItemProps> = ({ uid, onRemove }) => {
+const CuratorItem: React.FC<CuratorItemProps> = ({ uid, role, onRemove }) => {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -424,7 +460,7 @@ const CuratorItem: React.FC<CuratorItemProps> = ({ uid, onRemove }) => {
         </div>
         <div>
           <div className="text-sm font-bold">{user.displayName || 'Folio User'}</div>
-          <div className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">Curator</div>
+          <div className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">{role}</div>
         </div>
       </div>
       <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={onRemove}>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Music, MapPin, Share2, Heart, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
+import { Music, MapPin, Share2, Heart, ChevronLeft, ChevronRight, MessageCircle, Check } from 'lucide-react';
 import { Button } from './ui/Button';
 import { cn } from '../lib/utils';
 import { socialService } from '../services/socialService';
@@ -21,13 +21,57 @@ interface PostcardProps {
     title: string;
     artist: string;
   };
+  folioPrivacy?: string;
+  folioVisibility?: string;
+  folioToken?: string;
+  profilePrivacy?: string;
 }
 
-export const Postcard = ({ id, creatorId, mediaUrls, caption, location, date, musicTrack, isPremium = false }: PostcardProps) => {
+export const Postcard = ({ 
+  id, 
+  creatorId, 
+  folioId,
+  mediaUrls, 
+  caption, 
+  location, 
+  date, 
+  musicTrack, 
+  isPremium = false,
+  folioPrivacy,
+  folioVisibility,
+  folioToken,
+  profilePrivacy
+}: PostcardProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [showComments, setShowComments] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const isOwner = auth.currentUser?.uid === creatorId;
+  const isPublic = (folioPrivacy === 'public' || folioVisibility === 'public') && profilePrivacy === 'public';
+  const showShare = isOwner || isPublic || (folioToken && profilePrivacy === 'public');
+
+  const handleShare = () => {
+    const baseUrl = window.location.origin;
+    let path = '';
+    
+    // If the collection is fully public or has a public link enabled, use the premium public view
+    if ((folioPrivacy === 'public' || folioVisibility === 'public') && profilePrivacy === 'public') {
+      path = `/s/${folioId}`;
+    } 
+    // Default to private guest view
+    else {
+      path = `/v/${folioId}`;
+    }
+
+    let shareUrl = `${baseUrl}${path}?postcardId=${id}`;
+    if (folioToken) shareUrl += `&folioToken=${folioToken}`;
+    
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     const fetchSocialData = async () => {
@@ -76,7 +120,7 @@ export const Postcard = ({ id, creatorId, mediaUrls, caption, location, date, mu
   const prev = () => setCurrentIndex((prev) => (prev - 1 + mediaUrls.length) % mediaUrls.length);
 
   return (
-    <div className="max-w-2xl mx-auto bg-white shadow-2xl rounded-sm overflow-hidden border-[12px] border-white">
+    <div id={`postcard-${id}`} className="max-w-2xl mx-auto bg-white shadow-2xl rounded-sm overflow-hidden border-[12px] border-white">
       {/* Media Carousel */}
       <div className="aspect-square relative bg-canvas overflow-hidden group">
         <AnimatePresence mode="wait">
@@ -179,9 +223,16 @@ export const Postcard = ({ id, creatorId, mediaUrls, caption, location, date, mu
             >
               <MessageCircle size={20} className="text-charcoal/40 hover:text-sage transition-colors" />
             </Button>
-            <Button variant="ghost" size="sm" className="rounded-full p-2">
-              <Share2 size={20} className="text-charcoal/40" />
-            </Button>
+            {showShare && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="rounded-full p-2"
+                onClick={handleShare}
+              >
+                {copied ? <Check size={20} className="text-sage" /> : <Share2 size={20} className="text-charcoal/40" />}
+              </Button>
+            )}
           </div>
         </div>
 

@@ -12,7 +12,9 @@ import { Explore } from './components/Explore';
 import { MapView } from './components/MapView';
 import { Onboarding } from './components/Onboarding';
 import { PublicFolioView } from './components/PublicFolioView';
+import { FolioView } from './components/FolioView';
 import { ShareModal } from './components/ShareModal';
+import { FolioShareModal } from './components/FolioShareModal';
 import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Share2, Settings } from 'lucide-react';
@@ -40,6 +42,7 @@ function CreatorDashboard() {
   const [isCreating, setIsCreating] = useState(false);
   const [isEditingFolio, setIsEditingFolio] = useState(false);
   const [isSharingFolio, setIsSharingFolio] = useState(false);
+  const [isSharingFullFolio, setIsSharingFullFolio] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [realPostcards, setRealPostcards] = useState<any[]>([]);
   const [realFolios, setRealFolios] = useState<any[]>([]);
@@ -50,7 +53,7 @@ function CreatorDashboard() {
       setUser(user);
       if (user) {
         getDoc(doc(db, 'users', user.uid)).then(snap => {
-          if (snap.exists()) setUserProfile(snap.data());
+          if (snap.exists()) setUserProfile({ uid: user.uid, ...snap.data() });
         });
       }
     });
@@ -151,11 +154,18 @@ function CreatorDashboard() {
   useEffect(() => {
     if (!selectedFolioId || !user) return;
 
-    const q = query(
-      collection(db, 'postcards'),
-      where('folioId', '==', selectedFolioId),
-      orderBy('createdAt', 'desc')
-    );
+    const q = selectedFolioId === 'loose-leaves' 
+      ? query(
+          collection(db, 'postcards'),
+          where('folioId', '==', selectedFolioId),
+          where('creatorId', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        )
+      : query(
+          collection(db, 'postcards'),
+          where('folioId', '==', selectedFolioId),
+          orderBy('createdAt', 'desc')
+        );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -172,6 +182,23 @@ function CreatorDashboard() {
   }, [selectedFolioId, user]);
 
   const handleLogout = () => signOut(auth);
+
+  const handleShareCollection = (folio: any) => {
+    const baseUrl = window.location.origin;
+    let shareUrl = '';
+    
+    // If it's a public collection or has a public link enabled, use the premium public view
+    if ((folio.privacy === 'public' || folio.visibility === 'public') && userProfile?.profilePrivacy === 'public') {
+      shareUrl = `${baseUrl}/s/${folio.id}`;
+    } 
+    // Otherwise, use the private guest view link
+    else {
+      shareUrl = `${baseUrl}/v/${folio.id}`;
+    }
+
+    navigator.clipboard.writeText(shareUrl);
+    alert('Link copied to clipboard!');
+  };
 
   const selectedFolio = realFolios.find(f => f.id === selectedFolioId);
 
@@ -194,11 +221,24 @@ function CreatorDashboard() {
               exit={{ opacity: 0 }}
               className="space-y-12"
             >
-              <header className="px-6 text-center space-y-4">
+              <header className="px-6 text-center space-y-4 relative">
                 <h2 className="text-5xl md:text-7xl">Folio</h2>
                 <p className="text-charcoal/60 max-w-xl mx-auto italic">
-                  A curated collection of digital postcards. Private memories, shared with intention.
+                  A curated space for your digital postcards. Private memories, shared with intention.
                 </p>
+                {user && (
+                  <div className="flex justify-center pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-2" 
+                      onClick={() => setIsSharingFullFolio(true)}
+                    >
+                      <Share2 size={16} />
+                      Share Folio
+                    </Button>
+                  </div>
+                )}
               </header>
 
               {user ? (
@@ -214,6 +254,8 @@ function CreatorDashboard() {
                     setSelectedFolioId(id);
                     setView('postcard');
                   }} 
+                  onShare={handleShareCollection}
+                  isOwner={true}
                 />
               ) : (
                 <div className="text-center py-20">
@@ -237,25 +279,29 @@ function CreatorDashboard() {
                   className="gap-2 -ml-4"
                 >
                   <ArrowLeft size={18} />
-                  Back to Folios
+                  Back to Collections
                 </Button>
                 
-                {user && (
+                {user && selectedFolio && (
                   <div className="flex gap-4">
-                    {selectedFolioId !== 'loose-leaves' && (
+                    {selectedFolioId !== 'loose-leaves' && user.uid === selectedFolio.creatorId && (
                       <Button variant="ghost" size="sm" className="gap-2" onClick={() => setIsEditingFolio(true)}>
                         <Settings size={16} />
                         Edit Collection
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsSharingFolio(true)}>
-                      <Share2 size={16} />
-                      Share Folio
-                    </Button>
-                    <Button variant="secondary" size="sm" className="gap-2" onClick={() => setIsCreating(true)}>
-                      <Plus size={16} />
-                      Add to {selectedFolio?.title}
-                    </Button>
+                    {user.uid === selectedFolio.creatorId && (
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsSharingFolio(true)}>
+                        <Share2 size={16} />
+                        Share Collection
+                      </Button>
+                    )}
+                    {(user.uid === selectedFolio.creatorId || (selectedFolio.curators && selectedFolio.curators[user.uid] === 'editor')) && (
+                      <Button variant="secondary" size="sm" className="gap-2" onClick={() => setIsCreating(true)}>
+                        <Plus size={16} />
+                        Add to {selectedFolio?.title}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -290,6 +336,10 @@ function CreatorDashboard() {
                       date={postcard.date}
                       musicTrack={postcard.musicTrack}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
+                      folioPrivacy={postcard.folioPrivacy}
+                      folioVisibility={postcard.folioVisibility}
+                      folioToken={postcard.folioToken}
+                      profilePrivacy={userProfile?.profilePrivacy}
                     />
                   ))
                 )}
@@ -336,6 +386,15 @@ function CreatorDashboard() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {isSharingFullFolio && userProfile && (
+          <FolioShareModal 
+            user={userProfile}
+            onClose={() => setIsSharingFullFolio(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <footer className="py-12 border-t border-charcoal/5 text-center">
         <div className="text-charcoal/30 text-xs uppercase tracking-widest font-bold">
           &copy; 2026 Folio &mdash; Privacy First Sharing
@@ -357,6 +416,8 @@ export default function App() {
         <Route path="/v/:folioId" element={<GuestView />} />
         <Route path="/v/:folioId/:secureToken" element={<GuestView />} />
         <Route path="/s/:folioId" element={<PublicFolioView />} />
+        <Route path="/f/:username" element={<FolioView />} />
+        <Route path="/f/:username/invite/:shareId" element={<FolioView />} />
       </Routes>
     </Router>
   );

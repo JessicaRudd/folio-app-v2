@@ -1,19 +1,28 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Postcard } from './Postcard';
 import { motion } from 'motion/react';
-import { Globe, ArrowLeft, Share2 } from 'lucide-react';
+import { Globe, ArrowLeft, Share2, Check } from 'lucide-react';
 import { Button } from './ui/Button';
 
 export const PublicFolioView = () => {
   const { folioId } = useParams<{ folioId: string }>();
+  const [searchParams] = useSearchParams();
+  const postcardId = searchParams.get('postcardId');
   const [postcards, setPostcards] = useState<any[]>([]);
   const [folio, setFolio] = useState<any>(null);
   const [creator, setCreator] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -21,20 +30,45 @@ export const PublicFolioView = () => {
 
       try {
         const folioDoc = await getDoc(doc(db, 'folios', folioId));
-        if (!folioDoc.exists() || folioDoc.data().visibility !== 'public') {
+        if (!folioDoc.exists()) {
           setError(true);
           setLoading(false);
           return;
         }
 
         const folioData = folioDoc.data();
-        setFolio(folioData);
         
-        // Fetch Creator Data
-        const creatorDoc = await getDoc(doc(db, 'users', folioData.creatorId));
-        if (creatorDoc.exists()) {
-          setCreator(creatorDoc.data());
+        // Access Control: Public Folio View requires (public collection OR public link enabled)
+        const isPublicCollection = folioData.privacy === 'public' || folioData.visibility === 'public';
+
+        if (!isPublicCollection) {
+          setError(true);
+          setLoading(false);
+          return;
         }
+
+        // Fetch Creator Data (Optional, might fail if profile is private)
+        let creatorData = null;
+        try {
+          const creatorDoc = await getDoc(doc(db, 'users', folioData.creatorId));
+          creatorData = creatorDoc.exists() ? creatorDoc.data() : null;
+        } catch (e) {
+          console.warn('Could not fetch creator data (profile might be private):', e);
+        }
+
+        // If profile is private, we must ensure the collection is indeed public
+        // (The rules already enforce this for the folioDoc fetch, but we check again for safety)
+        if (!creatorData || creatorData.profilePrivacy !== 'public') {
+          // Use denormalized data if profile is private
+          creatorData = {
+            displayName: folioData.creatorName || 'Curator',
+            username: folioData.creatorUsername || '',
+            profilePrivacy: 'private'
+          };
+        }
+
+        setFolio(folioData);
+        setCreator(creatorData);
 
         // Fetch Postcards
         const q = query(
@@ -72,6 +106,17 @@ export const PublicFolioView = () => {
 
     fetchData();
   }, [folioId]);
+
+  useEffect(() => {
+    if (!loading && postcardId && postcards.length > 0) {
+      const element = document.getElementById(`postcard-${postcardId}`);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 500);
+      }
+    }
+  }, [loading, postcardId, postcards]);
 
   if (loading) {
     return (
@@ -145,6 +190,16 @@ export const PublicFolioView = () => {
                   <div className="text-sm font-serif">{creator?.displayName || 'Folio Curator'}</div>
                 </div>
               </div>
+
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 bg-white/80 backdrop-blur-sm"
+                onClick={handleShare}
+              >
+                {copied ? <Check size={16} className="text-sage" /> : <Share2 size={16} />}
+                {copied ? 'Link Copied' : 'Share Collection'}
+              </Button>
             </div>
           </motion.div>
         </div>
@@ -162,6 +217,9 @@ export const PublicFolioView = () => {
             <Postcard 
               {...postcard}
               isPremium={creator?.isPremium || creator?.role === 'admin'}
+              folioPrivacy={folio?.privacy}
+              folioVisibility={folio?.visibility}
+              profilePrivacy={creator?.profilePrivacy}
             />
           </motion.div>
         ))}

@@ -14,7 +14,7 @@ service cloud.firestore {
       return isAuthenticated() && 
         ( (request.auth.token.email == "jess@irudd.com" && request.auth.token.email_verified == true) ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
         );
     }
     function isValidEmail(email) {
@@ -59,52 +59,94 @@ service cloud.firestore {
     }
 
     function isValidFolio(data) {
-      let allowedFields = ['id', 'creatorId', 'title', 'description', 'location', 'coverImage', 'privacy', 'visibility', 'curators', 'allowedUsers', 'createdAt', 'postcardCount', 'folioDate', 'photoCount', 'creatorName', 'creatorUsername'];
-      return data.keys().hasOnly(allowedFields) &&
-             (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
-             data.creatorId is string && data.creatorId.size() < 100 &&
-             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
-             (!('description' in data) || (data.description is string && data.description.size() < 500)) &&
-             (!('location' in data) || (data.location is string && data.location.size() < 100)) &&
+      return (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
+             (!('creatorId' in data) || (data.creatorId is string && data.creatorId.size() < 100)) &&
+             (!('title' in data) || (data.title is string && data.title.size() > 0 && data.title.size() < 100)) &&
+             (!('description' in data) || (data.description is string && data.description.size() < 2000)) &&
+             (!('location' in data) || (data.location is string && data.location.size() < 500)) &&
              (!('privacy' in data) || data.privacy in ['private', 'personal', 'public']) &&
              (!('visibility' in data) || data.visibility in ['private', 'public']) &&
-             (!('folioDate' in data) || (data.folioDate is string && data.folioDate.size() < 20)) &&
-             (!('curators' in data) || (data.curators is list && data.curators.size() < 50)) &&
+             (!('folioDate' in data) || (data.folioDate is string && data.folioDate.size() < 100)) &&
+             (!('curators' in data) || (data.curators is map && data.curators.size() < 50)) &&
              (!('allowedUsers' in data) || (data.allowedUsers is list && data.allowedUsers.size() < 100)) &&
              (!('postcardCount' in data) || data.postcardCount is number) &&
              (!('photoCount' in data) || data.photoCount is number) &&
-             (!('creatorName' in data) || (data.creatorName is string && data.creatorName.size() < 100)) &&
-             (!('creatorUsername' in data) || (data.creatorUsername is string && data.creatorUsername.size() < 100));
+             (!('creatorName' in data) || (data.creatorName is string && data.creatorName.size() < 200)) &&
+             (!('creatorUsername' in data) || (data.creatorUsername is string && data.creatorUsername.size() < 200)) &&
+             (!('folioToken' in data) || (data.folioToken is string && data.folioToken.size() < 200)) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidFolioMetadata(data) {
+      let allowedFields = ['userId', 'shareToken', 'updatedAt'];
+      return data.keys().hasOnly(allowedFields) &&
+             data.userId is string &&
+             data.shareToken is string && data.shareToken.size() > 10;
+    }
+
+    function isValidFolioToken(data) {
+      let allowedFields = ['userId', 'createdAt'];
+      return data.keys().hasOnly(allowedFields) &&
+             data.userId is string;
     }
 
     function isValidShare(data) {
-      let requiredFields = ['folioId', 'type', 'status'];
-      let allowedFields = ['id', 'folioId', 'type', 'email', 'phone', 'status', 'accessedBy', 'createdAt'];
+      let requiredFields = ['type', 'status'];
+      let allowedFields = ['id', 'folioId', 'userId', 'username', 'type', 'email', 'phone', 'status', 'accessedBy', 'createdAt', 'updatedAt'];
       return data.keys().hasAll(requiredFields) &&
              data.keys().hasOnly(allowedFields) &&
-             data.folioId is string &&
-             data.type in ['guest', 'curator'] &&
+             (!('folioId' in data) || data.folioId is string) &&
+             (!('userId' in data) || data.userId is string) &&
+             data.type in ['guest', 'curator', 'folio'] &&
              data.status in ['active', 'revoked'];
     }
 
     function isValidPostcard(data) {
-      let requiredFields = ['folioId', 'creatorId', 'mediaUrls', 'secureToken'];
-      let allowedFields = ['id', 'folioId', 'creatorId', 'mediaUrls', 'caption', 'location', 'musicTrack', 'secureToken', 'createdAt', 'visibilityList', 'postcardDate', 'lat', 'lng', 'folioVisibility', 'folioPrivacy'];
-      return data.keys().hasAll(requiredFields) &&
-             data.keys().hasOnly(allowedFields) &&
-             (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
-             data.folioId is string && data.folioId.size() < 100 &&
-             data.creatorId is string && data.creatorId.size() < 100 &&
-             data.mediaUrls is list && data.mediaUrls.size() > 0 && data.mediaUrls.size() <= 5 &&
-             data.secureToken is string && data.secureToken.size() < 100 &&
-             (!('caption' in data) || (data.caption is string && data.caption.size() < 2000)) &&
-             (!('location' in data) || (data.location is string && data.location.size() < 100)) &&
-             (!('postcardDate' in data) || (data.postcardDate is string && data.postcardDate.size() < 20)) &&
+      return (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
+             (!('folioId' in data) || (data.folioId is string && data.folioId.size() < 100)) &&
+             (!('creatorId' in data) || (data.creatorId is string && data.creatorId.size() < 100)) &&
+             (!('mediaUrls' in data) || (data.mediaUrls is list && data.mediaUrls.size() > 0 && data.mediaUrls.size() <= 10)) &&
+             (!('secureToken' in data) || (data.secureToken is string && data.secureToken.size() < 200)) &&
+             (!('caption' in data) || (data.caption is string && data.caption.size() < 5000)) &&
+             (!('location' in data) || (data.location is string && data.location.size() < 500)) &&
+             (!('postcardDate' in data) || (data.postcardDate is string && data.postcardDate.size() < 100)) &&
              (!('visibilityList' in data) || (data.visibilityList is list && data.visibilityList.size() < 100)) &&
-             (!('lat' in data) || data.lat is number) &&
-             (!('lng' in data) || data.lng is number) &&
+             (!('lat' in data) || data.lat == null || data.lat is number) &&
+             (!('lng' in data) || data.lng == null || data.lng is number) &&
              (!('folioVisibility' in data) || data.folioVisibility in ['private', 'public']) &&
-             (!('folioPrivacy' in data) || data.folioPrivacy in ['private', 'personal', 'public']);
+             (!('folioPrivacy' in data) || data.folioPrivacy in ['private', 'personal', 'public']) &&
+             (!('folioToken' in data) || (data.folioToken is string && data.folioToken.size() < 200)) &&
+             (!('createdAt' in data) || data.createdAt is timestamp) &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isCuratorOfFolio(folioId) {
+      return isAuthenticated() && 
+             folioId != 'loose-leaves' &&
+             exists(/databases/$(database)/documents/folios/$(folioId)) &&
+             (get(/databases/$(database)/documents/folios/$(folioId)).data.creatorId == request.auth.uid || 
+              request.auth.uid in get(/databases/$(database)/documents/folios/$(folioId)).data.get('curators', {}));
+    }
+
+    function curatorRole(folioId) {
+      let folioPath = /databases/$(database)/documents/folios/$(folioId);
+      return (folioId != 'loose-leaves' && exists(folioPath)) ? 
+        ((get(folioPath).data.creatorId == request.auth.uid) ? 'owner' : get(folioPath).data.get('curators', {}).get(request.auth.uid, 'none')) : 
+        'none';
+    }
+
+    function hasFolioAccess(creatorId, token) {
+      return exists(/databases/$(database)/documents/folio_metadata/$(creatorId)) &&
+             get(/databases/$(database)/documents/folio_metadata/$(creatorId)).data.shareToken == token;
+    }
+
+    function isInvitedToFolio(folioId) {
+      return isAuthenticated() && 
+             folioId != 'loose-leaves' &&
+             exists(/databases/$(database)/documents/folios/$(folioId)) &&
+             get(/databases/$(database)/documents/folios/$(folioId)).data.get('privacy', 'private') == 'personal' && 
+             request.auth.token.email in get(/databases/$(database)/documents/folios/$(folioId)).data.get('allowedUsers', []);
     }
 
     function isOneCountChange(field) {
@@ -122,7 +164,8 @@ service cloud.firestore {
     // ===============================================================
     match /users/{userId} {
       // Protect PII: Only owner can read their own email. 
-      allow read: if isOwner(userId) || isAdmin();
+      // Public profiles can be read by anyone.
+      allow read: if isOwner(userId) || isAdmin() || resource.data.profilePrivacy == 'public';
       
       allow create: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data) && (request.resource.data.role in ['creator', 'user'] || isAdmin());
       allow update: if isAuthenticated() && (
@@ -176,58 +219,103 @@ service cloud.firestore {
     match /folios/{folioId} {
       function isCurator() {
         return isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
-               ('curators' in resource.data && request.auth.uid in resource.data.curators));
+               request.auth.uid in resource.data.get('curators', {}));
+      }
+      function role() {
+        return (resource.data.get('creatorId', '') == request.auth.uid) ? 'owner' : resource.data.get('curators', {}).get(request.auth.uid, 'none');
       }
 
-      allow read: if (resource.data.visibility == 'public') || 
-                   (resource.data.privacy == 'public') || 
+      allow read: if (resource.data.get('visibility', 'private') == 'public') || 
+                   (resource.data.get('privacy', 'private') == 'public') || 
                    isCurator() ||
-                   (isAuthenticated() && resource.data.privacy == 'personal' && request.auth.token.email in resource.data.allowedUsers);
+                   isAdmin() ||
+                   (isAuthenticated() && resource.data.get('privacy', 'private') == 'personal' && request.auth.token.email in resource.data.get('allowedUsers', [])) ||
+                   (resource.data.get('folioToken', '') != '' && resource.data.get('privacy', 'private') != 'personal') ||
+                   (resource.data.get('secureToken', '') != '');
       
       allow create: if isAuthenticated() && isValidFolio(request.resource.data) && (request.resource.data.creatorId == request.auth.uid || isAdmin()) &&
                     (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.total_folio_count < 10);
-      allow update: if isAuthenticated() && isValidFolio(request.resource.data) && (isCurator() || isAdmin());
+      allow update: if isAuthenticated() && (role() == 'owner' || isAdmin() || role() == 'editor');
       allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
+    }
+
+    match /folio_metadata/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /folio_tokens/{token} {
+      allow get: if true;
+      allow create, delete: if isAuthenticated() && (isOwner(request.resource.data.userId) || isOwner(resource.data.userId) || isAdmin());
     }
 
     match /postcards/{postcardId} {
       function folioIsPublic() {
-        return resource.data.folioVisibility == 'public' || resource.data.folioPrivacy == 'public';
+        return resource.data.get('folioVisibility', 'private') == 'public' || resource.data.get('folioPrivacy', 'private') == 'public';
       }
       function userIsCurator() {
-        let folio = get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data;
-        return isAuthenticated() && (folio.creatorId == request.auth.uid || 
-               ('curators' in folio && request.auth.uid in folio.curators));
+        return isCuratorOfFolio(resource.data.folioId);
+      }
+      function userIsInvited() {
+        return isInvitedToFolio(resource.data.folioId);
+      }
+      function role() {
+        return curatorRole(resource.data.folioId);
       }
 
-      // Allow read if the user is the creator or in the visibility list
+      // Allow read if the user is the creator, curator, invited, or in the visibility list
       allow get: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
-                    ('visibilityList' in resource.data && request.auth.uid in resource.data.visibilityList))) ||
-                    folioIsPublic() || userIsCurator();
+                    request.auth.uid in resource.data.get('visibilityList', []))) ||
+                    folioIsPublic() || userIsCurator() || userIsInvited() || isAdmin() ||
+                    (resource.data.get('folioToken', '') != '' && resource.data.get('folioPrivacy', 'private') != 'personal');
       
-      // Allow list (query) if the secureToken matches (enforced by query filter)
-      // This is the "No-Auth" guest access mechanism
+      // Allow list (query) if the secureToken matches or user has access
       allow list: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
-                    ('visibilityList' in resource.data && request.auth.uid in resource.data.visibilityList))) ||
-                     (resource.data.secureToken != null) ||
+                    request.auth.uid in resource.data.get('visibilityList', []))) ||
+                     (resource.data.get('secureToken', '') != '') ||
                      folioIsPublic() ||
-                     (isAuthenticated() && exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.creatorId)));
+                     userIsCurator() ||
+                     userIsInvited() ||
+                     isAdmin() ||
+                     (resource.data.get('folioToken', '') != '' && resource.data.get('folioPrivacy', 'private') != 'personal');
 
-      allow create: if isAuthenticated() && (isAdmin() || (isValidPostcard(request.resource.data) && request.resource.data.creatorId == request.auth.uid &&
+      allow create: if isAuthenticated() && (isAdmin() || (isValidPostcard(request.resource.data) && 
+                    (request.resource.data.creatorId == request.auth.uid) &&
+                    (role() == 'owner' || role() == 'editor') &&
                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.total_postcard_count < 100));
-      allow update, delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || role() == 'owner' || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || role() == 'owner' || isAdmin());
     }
 
     match /shares/{shareId} {
-      allow read: if (resource.data.status == 'active');
-      allow create: if isAuthenticated() && 
-        (get(/databases/$(database)/documents/folios/$(request.resource.data.folioId)).data.creatorId == request.auth.uid ||
-         request.auth.uid in get(/databases/$(database)/documents/folios/$(request.resource.data.folioId)).data.curators ||
-         isAdmin());
-      allow update, delete: if isAuthenticated() && 
-        (get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.creatorId == request.auth.uid ||
-         request.auth.uid in get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.curators ||
-         isAdmin());
+      allow get: if true;
+      allow list: if isAuthenticated() && (
+        (resource.data.get('type', '') == 'folio' && resource.data.userId == request.auth.uid) ||
+        (resource.data.get('type', '') != 'folio' && 
+         (get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.creatorId == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.get('curators', {}))) ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && isValidShare(request.resource.data) && (
+        (request.resource.data.type == 'folio' && request.resource.data.userId == request.auth.uid) ||
+        (request.resource.data.type != 'folio' && 
+         (get(/databases/$(database)/documents/folios/$(request.resource.data.folioId)).data.creatorId == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/folios/$(request.resource.data.folioId)).data.get('curators', {}))) ||
+        isAdmin()
+      );
+      allow update: if (isAuthenticated() && (
+        (resource.data.type == 'folio' && resource.data.userId == request.auth.uid) ||
+        (resource.data.type != 'folio' && 
+         (get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.creatorId == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.get('curators', {}))) ||
+        isAdmin()
+      )) || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accessedBy']));
+      allow delete: if isAuthenticated() && (
+        (resource.data.type == 'folio' && resource.data.userId == request.auth.uid) ||
+        (resource.data.type != 'folio' && 
+         (get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.creatorId == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.get('curators', {}))) ||
+        isAdmin()
+      );
     }
   }
 }

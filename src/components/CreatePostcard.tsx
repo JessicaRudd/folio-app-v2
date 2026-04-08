@@ -47,6 +47,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [userStats, setUserStats] = useState<any>(null);
+  const [folioMetadata, setFolioMetadata] = useState<any>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -55,6 +56,12 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
         if (userDoc.exists()) {
           setUserStats(userDoc.data());
+        }
+
+        // Fetch Folio Metadata for share token
+        const metaDoc = await getDoc(doc(db, 'folio_metadata', auth.currentUser.uid));
+        if (metaDoc.exists()) {
+          setFolioMetadata(metaDoc.data());
         }
         
         const q = query(collection(db, 'folios'), where('creatorId', '==', auth.currentUser.uid));
@@ -287,7 +294,9 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           photoCount: 0,
           privacy: 'private',
           visibility: 'private',
-          curators: []
+          profilePrivacy: userStats?.profilePrivacy || 'private',
+          curators: {},
+          folioToken: folioMetadata?.shareToken || ''
         });
         finalFolioId = folioDoc.id;
         
@@ -323,11 +332,15 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
       // Get folio visibility for denormalization
       let folioVisibility = 'private';
       let folioPrivacy = 'private';
+      let folioToken = folioMetadata?.shareToken || '';
+      
       if (finalFolioId !== 'loose-leaves') {
         const folioSnap = await getDoc(doc(db, 'folios', finalFolioId));
         if (folioSnap.exists()) {
-          folioVisibility = folioSnap.data().visibility || 'private';
-          folioPrivacy = folioSnap.data().privacy || 'private';
+          const fData = folioSnap.data();
+          folioVisibility = fData.visibility || 'private';
+          folioPrivacy = fData.privacy || 'private';
+          folioToken = fData.folioToken || folioToken;
         }
       }
 
@@ -346,7 +359,9 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           postcardDate: postcardDate,
           visibilityList: [], 
           folioVisibility,
-          folioPrivacy
+          folioPrivacy,
+          folioToken,
+          profilePrivacy: userStats?.profilePrivacy || 'private'
         });
 
         // 4. Update Metadata
@@ -681,7 +696,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
               ) : (
                 <Send size={18} />
               )}
-              {loading ? 'Posting...' : 'Post to Folio'}
+              {loading ? 'Posting...' : 'Post to Collection'}
             </Button>
           </div>
         )}

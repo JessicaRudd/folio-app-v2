@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Card } from './ui/Card';
-import { Calendar, Image as ImageIcon, MapPin, User } from 'lucide-react';
+import { Calendar, Image as ImageIcon, MapPin, User, Share2 } from 'lucide-react';
+import { Button } from './ui/Button';
 
 interface Folio {
   id: string;
@@ -14,15 +15,18 @@ interface Folio {
   location?: string;
   creatorName?: string;
   creatorUsername?: string;
+  privacy?: string;
 }
 
 interface FolioGridProps {
   folios: Folio[];
   onSelect: (id: string) => void;
+  onShare?: (folio: Folio) => void;
   showCreator?: boolean;
+  isOwner?: boolean;
 }
 
-export const FolioGrid = ({ folios, onSelect, showCreator = false }: FolioGridProps) => {
+export const FolioGrid = ({ folios, onSelect, onShare, showCreator = false, isOwner = false }: FolioGridProps) => {
   const formatFolioDate = (dateStr?: string, createdAt?: string) => {
     const target = dateStr || createdAt;
     if (!target) return '';
@@ -74,14 +78,29 @@ export const FolioGrid = ({ folios, onSelect, showCreator = false }: FolioGridPr
             </div>
             <div className="p-8 flex-1 flex flex-col space-y-4">
               <div className="flex items-start justify-between gap-4">
-                <h3 className="text-3xl font-serif tracking-tight leading-tight group-hover:text-sage transition-colors">
-                  {folio.title}
-                </h3>
-                {folio.location && (
-                  <div className="flex items-center gap-1 text-[9px] text-charcoal/30 uppercase font-bold tracking-[0.2em] pt-2">
-                    <MapPin size={10} />
-                    {folio.location}
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-3xl font-serif tracking-tight leading-tight group-hover:text-sage transition-colors truncate">
+                    {folio.title}
+                  </h3>
+                  {folio.location && (
+                    <div className="flex items-center gap-1 text-[9px] text-charcoal/30 uppercase font-bold tracking-[0.2em] pt-2">
+                      <MapPin size={10} />
+                      {folio.location}
+                    </div>
+                  )}
+                </div>
+                {onShare && (isOwner || folio.privacy === 'public') && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShare(folio);
+                    }}
+                  >
+                    <Share2 size={16} />
+                  </Button>
                 )}
               </div>
               
