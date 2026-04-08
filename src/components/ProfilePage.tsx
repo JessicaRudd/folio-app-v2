@@ -4,6 +4,9 @@ import { User, Mail, Globe, Lock, Save, Loader2, Camera, ChevronRight, ArrowLeft
 import { Button } from './ui/Button';
 import { auth, db, storage } from '../lib/firebase';
 import { Footer } from './Footer';
+import { Navbar } from './Navbar';
+import { FeedbackModal } from './FeedbackModal';
+import { AnimatePresence } from 'motion/react';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { cn } from '../lib/utils';
@@ -26,6 +29,7 @@ export const ProfilePage = () => {
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState('');
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   // Admin Panel State
   const [adminSearch, setAdminSearch] = useState('');
@@ -248,7 +252,16 @@ export const ProfilePage = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-canvas flex flex-col">
+      <Navbar 
+        user={auth.currentUser} 
+        onLogin={() => {}} 
+        onLogout={() => auth.signOut()} 
+        onCreate={() => navigate('/')} 
+        onFeedback={() => setIsFeedbackOpen(true)}
+      />
+      
+      <div className="max-w-4xl mx-auto px-6 py-12 flex-1">
       <div className="flex flex-col md:flex-row gap-12">
         {/* Sidebar */}
         <aside className="w-full md:w-64 space-y-8">
@@ -553,8 +566,19 @@ export const ProfilePage = () => {
           )}
         </main>
       </div>
+    </div>
       
-      <Footer user={auth.currentUser} />
+      <AnimatePresence>
+        {isFeedbackOpen && (
+          <FeedbackModal 
+            isOpen={isFeedbackOpen} 
+            onClose={() => setIsFeedbackOpen(false)} 
+            user={auth.currentUser}
+          />
+        )}
+      </AnimatePresence>
+
+      <Footer user={auth.currentUser} onFeedback={() => setIsFeedbackOpen(true)} />
     </div>
   );
 };

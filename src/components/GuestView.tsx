@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Postcard } from './Postcard';
+import { Navbar } from './Navbar';
+import { FeedbackModal } from './FeedbackModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { Lock, Globe, ArrowLeft, Mail, ShieldCheck, Loader2, CheckCircle2, Share2, Check, MessageSquare } from 'lucide-react';
 import { Button } from './ui/Button';
@@ -133,6 +135,7 @@ export const GuestView = () => {
   }, [collectionId, secureToken, folioToken, searchParams]);
 
   const [copied, setCopied] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const isProfilePublic = creator?.profilePrivacy === 'public';
 
   const handleShare = () => {
@@ -423,84 +426,104 @@ export const GuestView = () => {
   }
 
   return (
-    <div className="min-h-screen bg-canvas py-20 px-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="max-w-4xl mx-auto space-y-24"
-      >
-        <header className="text-center space-y-4 mb-20">
-          <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-sage mb-2">
-            {collectionData?.privacy === 'public' ? <Globe size={12} /> : <Lock size={12} />}
-            {collectionData?.privacy === 'public' ? 'Public Collection' : 'Private Guest View'}
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-4 mb-4">
-            <Link 
-              to="/"
-              className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
-            >
-              <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
-              Home
-            </Link>
-            <div className="w-px h-4 bg-charcoal/10" />
-            {collectionData?.privacy === 'public' && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2"
-                onClick={handleShare}
+    <div className="min-h-screen bg-canvas flex flex-col">
+      <Navbar 
+        user={null} 
+        onLogin={() => {}} 
+        onLogout={() => {}} 
+        onCreate={() => {}} 
+        onFeedback={() => setIsFeedbackOpen(true)}
+      />
+      
+      <main className="flex-1 py-20 px-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="max-w-4xl mx-auto space-y-24"
+        >
+          <header className="text-center space-y-4 mb-20">
+            <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-sage mb-2">
+              {collectionData?.privacy === 'public' ? <Globe size={12} /> : <Lock size={12} />}
+              {collectionData?.privacy === 'public' ? 'Public Collection' : 'Private Guest View'}
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-4 mb-4">
+              <Link 
+                to="/"
+                className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
               >
-                {copied ? <Check size={16} className="text-sage" /> : <Share2 size={16} />}
-                {copied ? 'Link Copied' : 'Share Collection'}
-              </Button>
-            )}
-            {creator?.username && (
+                <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
+                Home
+              </Link>
+              <div className="w-px h-4 bg-charcoal/10" />
+              {collectionData?.privacy === 'public' && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2"
+                  onClick={handleShare}
+                >
+                  {copied ? <Check size={16} className="text-sage" /> : <Share2 size={16} />}
+                  {copied ? 'Link Copied' : 'Share Collection'}
+                </Button>
+              )}
+              {creator?.username && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  asChild
+                  className="gap-2 text-charcoal/40 hover:text-charcoal transition-colors group"
+                >
+                  <Link to={`/f/${creator.username}${folioToken ? `?token=${folioToken}` : ''}`}>
+                    <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                    Back to Collections
+                  </Link>
+                </Button>
+              )}
               <Button 
                 variant="ghost" 
                 size="sm" 
-                asChild
+                onClick={() => navigate(-1)}
                 className="gap-2 text-charcoal/40 hover:text-charcoal transition-colors group"
               >
-                <Link to={`/f/${creator.username}${folioToken ? `?token=${folioToken}` : ''}`}>
-                  <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                  Back to Collections
-                </Link>
+                Back
               </Button>
+            </div>
+            <h1 className="text-5xl md:text-7xl font-serif">{collectionData?.title || 'A Special Collection'}</h1>
+            {collectionData?.description && (
+              <p className="text-charcoal/60 max-w-xl mx-auto italic editorial-text">
+                {collectionData.description}
+              </p>
             )}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => navigate(-1)}
-              className="gap-2 text-charcoal/40 hover:text-charcoal transition-colors group"
-            >
-              Back
-            </Button>
+            <div className="w-24 h-px bg-sage/20 mx-auto" />
+          </header>
+  
+          <div className="space-y-32">
+            {postcards.map((postcard) => (
+              <Postcard 
+                key={postcard.id} 
+                {...postcard}
+                isPremium={creator?.isPremium || creator?.role === 'admin'}
+                collectionPrivacy={collectionData?.privacy}
+                collectionVisibility={collectionData?.visibility}
+                folioToken={folioToken || collectionData?.folioToken}
+                profilePrivacy={creator?.profilePrivacy}
+              />
+            ))}
           </div>
-          <h1 className="text-5xl md:text-7xl font-serif">{collectionData?.title || 'A Special Collection'}</h1>
-          {collectionData?.description && (
-            <p className="text-charcoal/60 max-w-xl mx-auto italic editorial-text">
-              {collectionData.description}
-            </p>
-          )}
-          <div className="w-24 h-px bg-sage/20 mx-auto" />
-        </header>
+        </motion.div>
+      </main>
 
-        <div className="space-y-32">
-          {postcards.map((postcard) => (
-            <Postcard 
-              key={postcard.id} 
-              {...postcard}
-              isPremium={creator?.isPremium || creator?.role === 'admin'}
-              collectionPrivacy={collectionData?.privacy}
-              collectionVisibility={collectionData?.visibility}
-              folioToken={folioToken || collectionData?.folioToken}
-              profilePrivacy={creator?.profilePrivacy}
-            />
-          ))}
-        </div>
+      <AnimatePresence>
+        {isFeedbackOpen && (
+          <FeedbackModal 
+            isOpen={isFeedbackOpen} 
+            onClose={() => setIsFeedbackOpen(false)} 
+            user={null}
+          />
+        )}
+      </AnimatePresence>
 
-        <Footer />
-      </motion.div>
+      <Footer onFeedback={() => setIsFeedbackOpen(true)} />
     </div>
   );
 };

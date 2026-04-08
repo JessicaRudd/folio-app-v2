@@ -13,6 +13,7 @@ import { Seeder } from './Seeder';
 import { Navbar } from './Navbar';
 import { Onboarding } from './Onboarding';
 import { Footer } from './Footer';
+import { FeedbackModal } from './FeedbackModal';
 import { auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { AnimatePresence } from 'motion/react';
@@ -29,6 +30,7 @@ export const Explore = () => {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
 
   useEffect(() => {
@@ -215,6 +217,7 @@ export const Explore = () => {
         onLogin={() => setIsOnboarding(true)} 
         onLogout={handleLogout} 
         onCreate={handleCreate} 
+        onFeedback={() => setIsFeedbackOpen(true)}
       />
 
       <AnimatePresence>
@@ -459,7 +462,17 @@ export const Explore = () => {
         )}
       </main>
 
-      <Footer user={user} message="&copy; 2026 Folio &mdash; The Discovery Engine" />
+      <AnimatePresence>
+        {isFeedbackOpen && (
+          <FeedbackModal 
+            isOpen={isFeedbackOpen} 
+            onClose={() => setIsFeedbackOpen(false)} 
+            user={user}
+          />
+        )}
+      </AnimatePresence>
+
+      <Footer user={user} message="&copy; 2026 Folio &mdash; The Discovery Engine" onFeedback={() => setIsFeedbackOpen(true)} />
     </div>
   );
 };

@@ -19,6 +19,7 @@ import { LimitReachedModal } from './components/LimitReachedModal';
 import { AlertRibbon } from './components/AlertRibbon';
 import { Footer } from './components/Footer';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { FeedbackModal } from './components/FeedbackModal';
 import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Share2, Settings } from 'lucide-react';
@@ -47,6 +48,7 @@ function CreatorDashboard() {
   const [isEditingCollection, setIsEditingCollection] = useState(false);
   const [isSharingCollection, setIsSharingCollection] = useState(false);
   const [isSharingFullFolio, setIsSharingFullFolio] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [limitReachedType, setLimitReachedType] = useState<'folios' | 'postcards' | 'photos' | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
@@ -280,6 +282,7 @@ function CreatorDashboard() {
         }} 
         onLogout={handleLogout} 
         onCreate={handleCreatePostcard} 
+        onFeedback={() => setIsFeedbackOpen(true)}
       />
 
       <AnimatePresence>
@@ -494,7 +497,17 @@ function CreatorDashboard() {
         )}
       </AnimatePresence>
 
-      <Footer user={user} />
+      <AnimatePresence>
+        {isFeedbackOpen && (
+          <FeedbackModal 
+            isOpen={isFeedbackOpen} 
+            onClose={() => setIsFeedbackOpen(false)} 
+            user={user}
+          />
+        )}
+      </AnimatePresence>
+
+      <Footer user={user} onFeedback={() => setIsFeedbackOpen(true)} />
     </div>
   );
 }

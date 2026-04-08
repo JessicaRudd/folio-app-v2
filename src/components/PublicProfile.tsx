@@ -9,6 +9,9 @@ import { Button } from './ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
 import { socialService } from '../services/socialService';
 import { Footer } from './Footer';
+import { Navbar } from './Navbar';
+import { FeedbackModal } from './FeedbackModal';
+import { AnimatePresence } from 'motion/react';
 
 export const PublicProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -20,6 +23,7 @@ export const PublicProfile = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -157,7 +161,15 @@ export const PublicProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen bg-canvas flex flex-col">
+      <Navbar 
+        user={currentUser} 
+        onLogin={() => navigate('/')} 
+        onLogout={() => auth.signOut()} 
+        onCreate={() => navigate('/')} 
+        onFeedback={() => setIsFeedbackOpen(true)}
+      />
+      
       {/* Navigation */}
       <div className="max-w-7xl mx-auto px-6 pt-8 flex items-center justify-between">
         <div className="flex items-center gap-6">
@@ -282,7 +294,17 @@ export const PublicProfile = () => {
         )}
       </main>
 
-      <Footer user={currentUser} message={`Curated by ${userProfile.displayName} — Powered by Folio`} />
+      <AnimatePresence>
+        {isFeedbackOpen && (
+          <FeedbackModal 
+            isOpen={isFeedbackOpen} 
+            onClose={() => setIsFeedbackOpen(false)} 
+            user={currentUser}
+          />
+        )}
+      </AnimatePresence>
+
+      <Footer user={currentUser} message={`Curated by ${userProfile.displayName} — Powered by Folio`} onFeedback={() => setIsFeedbackOpen(true)} />
     </div>
   );
 };
