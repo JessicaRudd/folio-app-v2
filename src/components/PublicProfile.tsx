@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { FolioGrid } from './FolioGrid';
 import { Button } from './ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
+import { socialService } from '../services/socialService';
 
 export const PublicProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -27,16 +28,15 @@ export const PublicProfile = () => {
   }, []);
 
   useEffect(() => {
-    const fetchPublicProfile = async () => {
-      if (!username) return;
-      setLoading(true);
-      setError(null);
+    if (!username) return;
+    setLoading(true);
+    setError(null);
 
+    // 1. Find user by username in public_profiles
+    const profileRef = doc(db, 'public_profiles', username);
+    
+    const unsubscribe = onSnapshot(profileRef, async (profileSnapshot) => {
       try {
-        // 1. Find user by username in public_profiles
-        const profileRef = doc(db, 'public_profiles', username);
-        const profileSnapshot = await getDoc(profileRef);
-        
         let userData: any = null;
         let userId: string = '';
 
@@ -44,7 +44,7 @@ export const PublicProfile = () => {
           userData = profileSnapshot.data();
           userId = userData.uid;
         } else {
-          // Fallback: Check users collection for legacy users
+          // Fallback: Check users collection for legacy users (one-time check)
           const usersRef = collection(db, 'users');
           const q = query(usersRef, where('username', '==', username), where('profilePrivacy', '==', 'public'));
           const querySnapshot = await getDocs(q);
@@ -80,40 +80,36 @@ export const PublicProfile = () => {
 
         // 3. Check if following
         if (auth.currentUser) {
-          const followId = `${auth.currentUser.uid}_${userId}`;
-          const followRef = doc(db, 'follows', followId);
-          const followSnap = await getDoc(followRef);
-          setIsFollowing(followSnap.exists());
+          const following = await socialService.isFollowing(userId);
+          setIsFollowing(following);
         }
+        setLoading(false);
       } catch (err) {
         console.error('Error fetching public profile:', err);
         setError('An error occurred while loading the profile');
-      } finally {
         setLoading(false);
       }
-    };
+    }, (err) => {
+      console.error('Profile snapshot error:', err);
+      setError('Failed to connect to profile updates');
+      setLoading(false);
+    });
 
-    fetchPublicProfile();
+    return () => unsubscribe();
   }, [username, currentUser]);
 
   const handleFollow = async () => {
     if (!currentUser || !userProfile) return;
     setFollowLoading(true);
-    const followId = `${currentUser.uid}_${userProfile.id}`;
-    const followRef = doc(db, 'follows', followId);
 
     try {
-      if (isFollowing) {
-        await deleteDoc(followRef);
-        setIsFollowing(false);
-      } else {
-        await setDoc(followRef, {
-          followerId: currentUser.uid,
-          followingId: userProfile.id,
-          createdAt: serverTimestamp()
-        });
-        setIsFollowing(true);
-      }
+      const isNowFollowing = await socialService.toggleFollow(userProfile.id, userProfile.username);
+      setIsFollowing(isNowFollowing);
+      // Update local count for immediate feedback
+      setUserProfile(prev => ({
+        ...prev,
+        follower_count: (prev.follower_count || 0) + (isNowFollowing ? 1 : -1)
+      }));
     } catch (err) {
       console.error('Error toggling follow:', err);
     } finally {
@@ -209,8 +205,16 @@ export const PublicProfile = () => {
                   {publicFolios.length} Public Folios
                 </div>
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
+                  <User size={14} className="text-sage" />
+                  {userProfile.follower_count || 0} Followers
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
+                  <UserPlus size={14} className="text-sage" />
+                  {userProfile.following_count || 0} Following
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
                   <Calendar size={14} className="text-sage" />
-                  Joined {new Date(userProfile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  Joined {userProfile.createdAt ? new Date(userProfile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown'}
                 </div>
               </div>
             </div>

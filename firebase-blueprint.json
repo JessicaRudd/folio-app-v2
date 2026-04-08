@@ -10,11 +10,16 @@
         "displayName": { "type": "string" },
         "photoURL": { "type": "string", "format": "uri" },
         "role": { "type": "string", "enum": ["admin", "creator"] },
+        "isPremium": { "type": "boolean" },
         "bio": { "type": "string" },
         "username": { "type": "string" },
         "profilePrivacy": { "type": "string", "enum": ["private", "public"] },
         "total_storage_used": { "type": "number" },
-        "monthly_postcard_count": { "type": "number" }
+        "total_folio_count": { "type": "number" },
+        "total_postcard_count": { "type": "number" },
+        "monthly_postcard_count": { "type": "number" },
+        "follower_count": { "type": "number" },
+        "following_count": { "type": "number" }
       },
       "required": ["uid", "email"]
     },
@@ -28,9 +33,52 @@
         "photoURL": { "type": "string", "format": "uri" },
         "bio": { "type": "string" },
         "username": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "follower_count": { "type": "number" },
+        "following_count": { "type": "number" }
       },
       "required": ["uid", "username"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "A like on a postcard",
+      "type": "object",
+      "properties": {
+        "postcardId": { "type": "string" },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postcardId", "userId"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a postcard",
+      "type": "object",
+      "properties": {
+        "postcardId": { "type": "string" },
+        "userId": { "type": "string" },
+        "text": { "type": "string" },
+        "userDisplayName": { "type": "string" },
+        "userPhotoURL": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postcardId", "userId", "text"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A notification for a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["like", "comment", "follow"] },
+        "fromUserId": { "type": "string" },
+        "fromUserName": { "type": "string" },
+        "postcardId": { "type": "string" },
+        "text": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "fromUserId"]
     },
     "Follow": {
       "title": "Follow",
@@ -78,6 +126,8 @@
         "musicTrackId": { "type": "string" },
         "visibilityList": { "type": "array", "items": { "type": "string" } },
         "secureToken": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
         "postcardDate": { "type": "string", "format": "date" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -96,6 +146,18 @@
     "/follows/{followId}": {
       "schema": "Follow",
       "description": "User follow relationships"
+    },
+    "/likes/{likeId}": {
+      "schema": "Like",
+      "description": "Postcard likes"
+    },
+    "/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Postcard comments"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
     },
     "/folios/{folioId}": {
       "schema": "Folio",

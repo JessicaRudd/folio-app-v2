@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Loader2, ArrowLeft, ImageIcon, Calendar, Music } from 'lucide-react';
 import { db, auth } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { Button } from './ui/Button';
 import { useNavigate } from 'react-router-dom';
 
@@ -51,21 +51,50 @@ export const MapView = () => {
         // Geocode each location
         // Note: In a real app, we should store coordinates in Firestore to avoid geocoding on every load
         for (const postcard of postcards as any[]) {
+          // Use stored coordinates if available
+          if (postcard.lat !== null && postcard.lng !== null && postcard.lat !== undefined && postcard.lng !== undefined) {
+            geocodedLocations.push({
+              id: postcard.id,
+              lat: postcard.lat,
+              lng: postcard.lng,
+              caption: postcard.caption || '',
+              locationName: postcard.location || 'Untitled',
+              mediaUrl: postcard.mediaUrls?.[0] || '',
+              date: postcard.postcardDate || postcard.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+              folioId: postcard.folioId
+            });
+            continue;
+          }
+
           if (postcard.location && postcard.location.trim()) {
             try {
+              // Add a small delay to respect Nominatim's rate limit (1 request per second)
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
               const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(postcard.location)}&limit=1`);
+              if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+              
               const data = await response.json();
               if (data && data.length > 0) {
+                const lat = parseFloat(data[0].lat);
+                const lng = parseFloat(data[0].lon);
                 geocodedLocations.push({
                   id: postcard.id,
-                  lat: parseFloat(data[0].lat),
-                  lng: parseFloat(data[0].lon),
+                  lat: lat,
+                  lng: lng,
                   caption: postcard.caption || '',
                   locationName: postcard.location,
                   mediaUrl: postcard.mediaUrls?.[0] || '',
                   date: postcard.postcardDate || postcard.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
                   folioId: postcard.folioId
                 });
+
+                // Update Firestore with coordinates for future loads
+                try {
+                  await updateDoc(doc(db, 'postcards', postcard.id), { lat, lng });
+                } catch (updateErr) {
+                  console.warn('Failed to update postcard coordinates:', updateErr);
+                }
               }
             } catch (err) {
               console.error(`Error geocoding ${postcard.location}:`, err);

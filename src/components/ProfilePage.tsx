@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { User, Mail, Globe, Lock, Save, Loader2, Camera, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/Button';
 import { auth, db, storage } from '../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -17,51 +17,114 @@ export const ProfilePage = () => {
     bio: '',
     username: '',
     profilePrivacy: 'private',
-    photoURL: ''
+    photoURL: '',
+    role: 'creator',
+    isPremium: false,
+    follower_count: 0,
+    following_count: 0
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState('');
 
+  // Admin Panel State
+  const [adminSearch, setAdminSearch] = useState('');
+  const [foundUser, setFoundUser] = useState<any>(null);
+  const [searchingUser, setSearchingUser] = useState(false);
+  const [updatingRole, setUpdatingRole] = useState(false);
+
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!auth.currentUser) return;
+    if (!auth.currentUser) return;
+    
+    setLoading(true);
+    const userRef = doc(db, 'users', auth.currentUser.uid);
+    
+    const unsubscribe = onSnapshot(userRef, async (userDoc) => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
           setProfile({
-            displayName: data.displayName || auth.currentUser.displayName || '',
+            displayName: data.displayName || auth.currentUser?.displayName || '',
             bio: data.bio || '',
             username: data.username || '',
             profilePrivacy: data.profilePrivacy || 'private',
-            photoURL: data.photoURL || auth.currentUser.photoURL || ''
+            photoURL: data.photoURL || auth.currentUser?.photoURL || '',
+            role: data.role || 'creator',
+            isPremium: data.isPremium || false,
+            follower_count: data.follower_count || 0,
+            following_count: data.following_count || 0
           });
-          setAvatarPreview(data.photoURL || auth.currentUser.photoURL || '');
+          setAvatarPreview(data.photoURL || auth.currentUser?.photoURL || '');
         } else {
           // Initialize profile if it doesn't exist
           const initialProfile = {
-            uid: auth.currentUser.uid,
-            email: auth.currentUser.email,
-            displayName: auth.currentUser.displayName || '',
+            uid: auth.currentUser?.uid,
+            email: auth.currentUser?.email,
+            displayName: auth.currentUser?.displayName || '',
             bio: '',
             username: '',
-            photoURL: auth.currentUser.photoURL || '',
+            photoURL: auth.currentUser?.photoURL || '',
             profilePrivacy: 'private',
             role: 'creator',
-            createdAt: new Date().toISOString()
+            isPremium: false,
+            follower_count: 0,
+            following_count: 0,
+            createdAt: new Date().toISOString(),
+            total_folio_count: 0,
+            total_postcard_count: 0
           };
-          await setDoc(doc(db, 'users', auth.currentUser.uid), initialProfile);
-          setProfile(initialProfile);
-          setAvatarPreview(auth.currentUser.photoURL || '');
+          await setDoc(userRef, initialProfile);
+          // Snapshot will fire again with the new data
         }
       } catch (error) {
         console.error('Error fetching profile:', error);
       } finally {
         setLoading(false);
       }
-    };
-    fetchProfile();
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  const searchUser = async () => {
+    if (!adminSearch.trim()) return;
+    setSearchingUser(true);
+    setFoundUser(null);
+    try {
+      // Search by username in public_profiles
+      const profileDoc = await getDoc(doc(db, 'public_profiles', adminSearch.trim()));
+      if (profileDoc.exists()) {
+        const uid = profileDoc.data().uid;
+        const userDoc = await getDoc(doc(db, 'users', uid));
+        if (userDoc.exists()) {
+          setFoundUser({ id: userDoc.id, ...userDoc.data() });
+        }
+      } else {
+        alert('User not found. Search by exact username.');
+      }
+    } catch (err) {
+      console.error('Search failed:', err);
+    } finally {
+      setSearchingUser(false);
+    }
+  };
+
+  const toggleAdminRole = async () => {
+    if (!foundUser) return;
+    setUpdatingRole(true);
+    try {
+      const newRole = foundUser.role === 'admin' ? 'creator' : 'admin';
+      await updateDoc(doc(db, 'users', foundUser.id), {
+        role: newRole
+      });
+      setFoundUser({ ...foundUser, role: newRole });
+      alert(`User role updated to ${newRole}`);
+    } catch (err) {
+      console.error('Role update failed:', err);
+      alert('Failed to update role. Permission denied.');
+    } finally {
+      setUpdatingRole(false);
+    }
+  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,27 +145,27 @@ export const ProfilePage = () => {
         photoURL = await getDownloadURL(uploadResult.ref);
       }
 
-      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
-        ...profile,
+      // Only update editable fields to avoid overwriting counts
+      const editableData = {
+        displayName: profile.displayName,
+        bio: profile.bio,
+        username: profile.username,
+        profilePrivacy: profile.profilePrivacy,
         photoURL,
         updatedAt: new Date().toISOString()
-      });
+      };
+
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), editableData);
 
       // Sync Public Profile
       if (profile.profilePrivacy === 'public' && profile.username) {
         await setDoc(doc(db, 'public_profiles', profile.username), {
           uid: auth.currentUser.uid,
-          displayName: profile.displayName,
-          photoURL,
-          bio: profile.bio,
-          username: profile.username,
-          createdAt: profile.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-      } else if (profile.username) {
-        // If switched to private, we could delete the public profile
-        // For now, let's just not update it, or we could explicitly delete it
-        // await deleteDoc(doc(db, 'public_profiles', profile.username));
+          ...editableData,
+          follower_count: profile.follower_count || 0,
+          following_count: profile.following_count || 0,
+          createdAt: profile.createdAt || new Date().toISOString()
+        }, { merge: true });
       }
       
       setProfile(prev => ({ ...prev, photoURL }));
@@ -145,19 +208,13 @@ export const ProfilePage = () => {
           </div>
 
           <nav className="space-y-1">
-            <button className="w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm text-sm font-bold uppercase tracking-widest text-sage">
+            <div className="w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm text-sm font-bold uppercase tracking-widest text-sage border border-sage/10">
               Profile Settings <ChevronRight size={16} />
-            </button>
-            <button className="w-full flex items-center justify-between p-3 text-sm font-bold uppercase tracking-widest text-charcoal/40 hover:text-charcoal transition-colors">
-              Account <ChevronRight size={16} />
-            </button>
-            <button className="w-full flex items-center justify-between p-3 text-sm font-bold uppercase tracking-widest text-charcoal/40 hover:text-charcoal transition-colors">
-              Notifications <ChevronRight size={16} />
-            </button>
+            </div>
             {profile.username && profile.profilePrivacy === 'public' && (
               <button 
                 onClick={() => window.open(`/u/${profile.username}`, '_blank')}
-                className="w-full flex items-center justify-between p-3 text-sm font-bold uppercase tracking-widest text-sage hover:bg-sage/5 transition-all rounded-lg mt-4"
+                className="w-full flex items-center justify-between p-3 text-sm font-bold uppercase tracking-widest text-charcoal/60 hover:text-sage hover:bg-sage/5 transition-all rounded-lg mt-4"
               >
                 View Public Profile <Globe size={16} />
               </button>
@@ -176,16 +233,16 @@ export const ProfilePage = () => {
           <section className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-3xl font-serif">Curator Profile</h2>
-              {profile.username && profile.profilePrivacy === 'public' && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => window.open(`/u/${profile.username}`, '_blank')}
-                  className="text-sage gap-2"
-                >
-                  <Globe size={16} /> View Public Profile
-                </Button>
-              )}
+              <div className="flex gap-6">
+                <div className="text-center">
+                  <div className="text-xl font-bold">{profile.follower_count}</div>
+                  <div className="text-[10px] text-charcoal/40 uppercase font-bold tracking-widest">Followers</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-bold">{profile.following_count}</div>
+                  <div className="text-[10px] text-charcoal/40 uppercase font-bold tracking-widest">Following</div>
+                </div>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -275,6 +332,65 @@ export const ProfilePage = () => {
               {saving ? 'Saving Changes...' : 'Save Profile'}
             </Button>
           </div>
+
+          {(profile.role === 'admin' || auth.currentUser?.email === 'jess@irudd.com') && (
+            <section className="space-y-6 pt-12 border-t border-charcoal/5">
+              <div className="flex items-center gap-3 text-sage">
+                <Lock size={24} />
+                <h3 className="text-xl font-serif">Admin Panel</h3>
+              </div>
+              
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-charcoal/5 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Manage User Roles</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={adminSearch}
+                      onChange={(e) => setAdminSearch(e.target.value)}
+                      placeholder="Search by username..."
+                      className="flex-1 p-3 bg-canvas rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all"
+                    />
+                    <Button onClick={searchUser} disabled={searchingUser}>
+                      {searchingUser ? <Loader2 className="animate-spin" size={18} /> : 'Search'}
+                    </Button>
+                  </div>
+                </div>
+
+                {foundUser && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-canvas rounded-xl flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-white">
+                        {foundUser.photoURL ? (
+                          <img src={foundUser.photoURL} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-charcoal/20">
+                            <User size={24} />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-bold">{foundUser.displayName}</div>
+                        <div className="text-xs text-charcoal/40">@{foundUser.username} • {foundUser.role}</div>
+                      </div>
+                    </div>
+                    <Button 
+                      variant={foundUser.role === 'admin' ? 'ghost' : 'primary'}
+                      size="sm"
+                      onClick={toggleAdminRole}
+                      disabled={updatingRole}
+                    >
+                      {updatingRole ? <Loader2 className="animate-spin" size={16} /> : (foundUser.role === 'admin' ? 'Revoke Admin' : 'Make Admin')}
+                    </Button>
+                  </motion.div>
+                )}
+              </div>
+            </section>
+          )}
         </main>
       </div>
     </div>

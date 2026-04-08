@@ -12,9 +12,10 @@ service cloud.firestore {
     }
     function isAdmin() {
       return isAuthenticated() && 
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "jess@irudd.com" && request.auth.token.email_verified == true));
+        ( (request.auth.token.email == "jess@irudd.com" && request.auth.token.email_verified == true) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        );
     }
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
@@ -36,14 +37,25 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
     function isValidUser(data) {
-      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'role', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'monthly_postcard_count', 'createdAt', 'updatedAt'];
+      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'photoUrl', 'role', 'isPremium', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'total_folio_count', 'total_postcard_count', 'monthly_postcard_count', 'follower_count', 'following_count', 'createdAt', 'updatedAt', 'lastLogin', 'providerId', 'emailVerified', 'phoneNumber', 'disabled', 'metadata', 'customClaims'];
       return data.keys().hasOnly(allowedFields) &&
-             data.uid is string && data.uid.size() < 100 &&
-             data.email is string && isValidEmail(data.email) &&
+             (!('uid' in data) || (data.uid is string && data.uid.size() < 100)) &&
+             (!('email' in data) || (data.email is string && isValidEmail(data.email))) &&
              (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
              (!('bio' in data) || (data.bio is string && data.bio.size() < 1000)) &&
              (!('username' in data) || (data.username is string && data.username.size() < 50)) &&
-             (!('profilePrivacy' in data) || data.profilePrivacy in ['private', 'public']);
+             (!('profilePrivacy' in data) || data.profilePrivacy in ['private', 'public']) &&
+             (!('role' in data) || data.role in ['admin', 'creator', 'user']) &&
+             (!('isPremium' in data) || data.isPremium is bool) &&
+             (!('follower_count' in data) || data.follower_count is number) &&
+             (!('following_count' in data) || data.following_count is number) &&
+             (!('total_folio_count' in data) || data.total_folio_count is number) &&
+             (!('total_postcard_count' in data) || data.total_postcard_count is number);
+    }
+
+    function isValidPublicProfile(data) {
+      let allowedFields = ['uid', 'displayName', 'photoURL', 'photoUrl', 'bio', 'username', 'profilePrivacy', 'follower_count', 'following_count', 'createdAt', 'updatedAt'];
+      return data.keys().hasOnly(allowedFields);
     }
 
     function isValidFolio(data) {
@@ -65,18 +77,30 @@ service cloud.firestore {
 
     function isValidPostcard(data) {
       let requiredFields = ['folioId', 'creatorId', 'mediaUrls', 'secureToken'];
-      let allowedFields = ['id', 'folioId', 'creatorId', 'mediaUrls', 'caption', 'location', 'musicTrack', 'secureToken', 'createdAt', 'visibilityList', 'postcardDate'];
+      let allowedFields = ['id', 'folioId', 'creatorId', 'mediaUrls', 'caption', 'location', 'musicTrack', 'secureToken', 'createdAt', 'visibilityList', 'postcardDate', 'lat', 'lng'];
       return data.keys().hasAll(requiredFields) &&
              data.keys().hasOnly(allowedFields) &&
              (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
              data.folioId is string && data.folioId.size() < 100 &&
              data.creatorId is string && data.creatorId.size() < 100 &&
-             data.mediaUrls is list && data.mediaUrls.size() > 0 && data.mediaUrls.size() < 20 &&
+             data.mediaUrls is list && data.mediaUrls.size() > 0 && data.mediaUrls.size() <= 5 &&
              data.secureToken is string && data.secureToken.size() < 100 &&
              (!('caption' in data) || (data.caption is string && data.caption.size() < 2000)) &&
              (!('location' in data) || (data.location is string && data.location.size() < 100)) &&
              (!('postcardDate' in data) || (data.postcardDate is string && data.postcardDate.size() < 20)) &&
-             (!('visibilityList' in data) || (data.visibilityList is list && data.visibilityList.size() < 100));
+             (!('visibilityList' in data) || (data.visibilityList is list && data.visibilityList.size() < 100)) &&
+             (!('lat' in data) || data.lat is number) &&
+             (!('lng' in data) || data.lng is number);
+    }
+
+    function isOneCountChange(field) {
+      let oldVal = (field in resource.data) ? resource.data[field] : 0;
+      let newVal = (field in request.resource.data) ? request.resource.data[field] : 0;
+      return math.abs(newVal - oldVal) == 1;
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
     }
 
     // ===============================================================
@@ -86,20 +110,53 @@ service cloud.firestore {
       // Protect PII: Only owner can read their own email. 
       allow read: if isOwner(userId) || isAdmin();
       
-      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'creator';
-      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data) && (request.resource.data.role in ['creator', 'user'] || isAdmin());
+      allow update: if isAuthenticated() && (
+        isOwner(userId) || 
+        isAdmin() || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['follower_count']) && isOneCountChange('follower_count'))
+      ) && isValidUser(request.resource.data) && (
+        isOwner(userId) || 
+        isAdmin() || 
+        areImmutableFieldsUnchanged(['role', 'uid', 'email', 'createdAt'])
+      );
     }
 
     match /public_profiles/{username} {
       allow read: if true;
-      allow create, update: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
-      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.uid || isAdmin());
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.uid) || 
+        isAdmin() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['follower_count']) && isOneCountChange('follower_count')) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['following_count']) && isOneCountChange('following_count'))
+      ) && isValidPublicProfile(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
     }
 
     match /follows/{followId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.followerId;
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.followerId;
+      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.followerId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.followerId || isAdmin());
+    }
+
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
     match /folios/{folioId} {
@@ -108,8 +165,9 @@ service cloud.firestore {
                     (resource.data.privacy == 'personal' && request.auth.token.email in resource.data.allowedUsers))) ||
                    (resource.data.privacy == 'private' || !('privacy' in resource.data));
       
-      allow create: if isAuthenticated() && isValidFolio(request.resource.data) && request.resource.data.creatorId == request.auth.uid;
-      allow update: if isAuthenticated() && isValidFolio(request.resource.data) && (resource.data.creatorId == request.auth.uid || isAdmin()) && request.resource.data.creatorId == resource.data.creatorId;
+      allow create: if isAuthenticated() && isValidFolio(request.resource.data) && (request.resource.data.creatorId == request.auth.uid || isAdmin()) &&
+                    (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.total_folio_count < 10);
+      allow update: if isAuthenticated() && isValidFolio(request.resource.data) && (resource.data.creatorId == request.auth.uid || isAdmin()) && (request.resource.data.creatorId == resource.data.creatorId || isAdmin());
       allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
 
@@ -123,9 +181,11 @@ service cloud.firestore {
       allow list: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
                     ('visibilityList' in resource.data && request.auth.uid in resource.data.visibilityList))) ||
                      (resource.data.secureToken != null) ||
-                     (get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.privacy == 'public');
+                     (get(/databases/$(database)/documents/folios/$(resource.data.folioId)).data.privacy == 'public') ||
+                     (isAuthenticated() && exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + resource.data.creatorId)));
 
-      allow create: if isAuthenticated() && (isAdmin() || (isValidPostcard(request.resource.data) && request.resource.data.creatorId == request.auth.uid));
+      allow create: if isAuthenticated() && (isAdmin() || (isValidPostcard(request.resource.data) && request.resource.data.creatorId == request.auth.uid &&
+                    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.total_postcard_count < 100));
       allow update, delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
     }
   }

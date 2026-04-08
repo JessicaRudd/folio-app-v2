@@ -1,25 +1,63 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Music, MapPin, Share2, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Music, MapPin, Share2, Heart, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { Button } from './ui/Button';
 import { cn } from '../lib/utils';
+import { socialService } from '../services/socialService';
+import { auth } from '../lib/firebase';
+import { Comments } from './Comments';
 
 interface PostcardProps {
   key?: string;
   id: string;
   folioId: string;
+  creatorId: string;
   mediaUrls: string[];
   caption: string;
   location?: string;
   date: string;
+  isPremium?: boolean;
   musicTrack?: {
     title: string;
     artist: string;
   };
 }
 
-export const Postcard = ({ mediaUrls, caption, location, date, musicTrack }: PostcardProps) => {
+export const Postcard = ({ id, creatorId, mediaUrls, caption, location, date, musicTrack, isPremium = false }: PostcardProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [showComments, setShowComments] = useState(false);
+
+  useEffect(() => {
+    const fetchSocialData = async () => {
+      try {
+        const [hasLiked, count] = await Promise.all([
+          socialService.hasLiked(id),
+          socialService.getLikeCount(id)
+        ]);
+        setLiked(hasLiked);
+        setLikeCount(count);
+      } catch (err) {
+        console.error('Failed to fetch social data:', err);
+      }
+    };
+    fetchSocialData();
+  }, [id]);
+
+  const handleLike = async () => {
+    if (!auth.currentUser) {
+      alert('Please login to like postcards.');
+      return;
+    }
+    try {
+      const isLiked = await socialService.toggleLike(id, creatorId);
+      setLiked(isLiked);
+      setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+    }
+  };
 
   const formatDate = (dateStr: string, options: Intl.DateTimeFormatOptions) => {
     if (!dateStr) return '';
@@ -84,15 +122,17 @@ export const Postcard = ({ mediaUrls, caption, location, date, musicTrack }: Pos
         )}
         
         {/* Stamp/Postmark Overlay */}
-        <div className="absolute top-6 right-6 w-24 h-24 opacity-20 pointer-events-none rotate-12">
-          <svg viewBox="0 0 100 100" className="w-full h-full fill-charcoal">
-            <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
-            <text x="50" y="45" textAnchor="middle" className="text-[10px] font-serif uppercase tracking-tighter">Folio</text>
-            <text x="50" y="60" textAnchor="middle" className="text-[8px] font-sans uppercase tracking-widest">
-              {formatDate(date, { month: 'short', year: '2-digit' })}
-            </text>
-          </svg>
-        </div>
+        {!isPremium && (
+          <div className="absolute top-6 right-6 w-24 h-24 opacity-40 pointer-events-none rotate-12">
+            <svg viewBox="0 0 100 100" className="w-full h-full fill-charcoal">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
+              <text x="50" y="45" textAnchor="middle" className="text-[10px] font-serif uppercase tracking-tighter">Folio</text>
+              <text x="50" y="60" textAnchor="middle" className="text-[8px] font-sans uppercase tracking-widest">
+                {formatDate(date, { month: 'short', year: '2-digit' })}
+              </text>
+            </svg>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -114,8 +154,30 @@ export const Postcard = ({ mediaUrls, caption, location, date, musicTrack }: Pos
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" className="rounded-full p-2">
-              <Heart size={20} className="text-charcoal/40 hover:text-red-500 transition-colors" />
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold text-charcoal/30">{likeCount}</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="rounded-full p-2"
+                onClick={handleLike}
+              >
+                <Heart 
+                  size={20} 
+                  className={cn(
+                    "transition-all duration-300",
+                    liked ? "fill-red-500 text-red-500 scale-110" : "text-charcoal/40 hover:text-red-500"
+                  )} 
+                />
+              </Button>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="rounded-full p-2"
+              onClick={() => setShowComments(true)}
+            >
+              <MessageCircle size={20} className="text-charcoal/40 hover:text-sage transition-colors" />
             </Button>
             <Button variant="ghost" size="sm" className="rounded-full p-2">
               <Share2 size={20} className="text-charcoal/40" />
@@ -126,6 +188,16 @@ export const Postcard = ({ mediaUrls, caption, location, date, musicTrack }: Pos
         <div className="editorial-text border-l-2 border-sage/20 pl-6 py-2">
           {caption}
         </div>
+
+        <AnimatePresence>
+          {showComments && (
+            <Comments 
+              postcardId={id} 
+              creatorId={creatorId} 
+              onClose={() => setShowComments(false)} 
+            />
+          )}
+        </AnimatePresence>
 
         {musicTrack && (
           <motion.div 

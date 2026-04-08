@@ -1,19 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Globe, Search, Loader2, User, MapPin, Calendar, ArrowLeft, ChevronRight } from 'lucide-react';
+import { Globe, Search, Loader2, User, MapPin, Calendar, ArrowLeft, ChevronRight, Heart, MessageCircle } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { FolioGrid } from './FolioGrid';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Button } from './ui/Button';
+import { Postcard } from './Postcard';
+import { socialService } from '../services/socialService';
+
+import { Seeder } from './Seeder';
+import { Navbar } from './Navbar';
+import { Onboarding } from './Onboarding';
+import { auth, handleFirestoreError, OperationType } from '../lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { AnimatePresence } from 'motion/react';
 
 export const Explore = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [publicFolios, setPublicFolios] = useState<any[]>([]);
   const [publicCurators, setPublicCurators] = useState<any[]>([]);
+  const [feedPostcards, setFeedPostcards] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+  const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      if (user) {
+        getDoc(doc(db, 'users', user.uid)).then(snap => {
+          if (snap.exists()) setUserProfile(snap.data());
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = () => signOut(auth);
+  const handleCreate = () => navigate('/'); // Redirect to home to create
 
   useEffect(() => {
     setSearchQuery(searchParams.get('q') || '');
@@ -22,13 +51,13 @@ export const Explore = () => {
   useEffect(() => {
     const fetchExploreData = async () => {
       setLoading(true);
+      setError(null);
       try {
         // 1. Fetch Public Folios
         const foliosRef = collection(db, 'folios');
         const foliosQuery = query(
           foliosRef,
           where('privacy', '==', 'public'),
-          orderBy('createdAt', 'desc'),
           limit(20)
         );
         
@@ -55,15 +84,82 @@ export const Explore = () => {
         }));
         setPublicCurators(curators);
 
+        // 3. Fetch Personalized Feed if logged in
+        if (auth.currentUser) {
+          const followedIds = await socialService.getFollowedUserIds();
+          
+          // Fetch postcards from followed users
+          let followedPostcards: any[] = [];
+          if (followedIds.length > 0) {
+            const chunks = [];
+            for (let i = 0; i < followedIds.length; i += 10) {
+              chunks.push(followedIds.slice(i, i + 10));
+            }
+            
+            for (const chunk of chunks) {
+              const q = query(
+                collection(db, 'postcards'),
+                where('creatorId', 'in', chunk),
+                orderBy('createdAt', 'desc'),
+                limit(10)
+              );
+              const snap = await getDocs(q);
+              followedPostcards.push(...snap.docs.map(doc => ({ 
+                id: doc.id, 
+                ...doc.data(),
+                date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+              })));
+            }
+          }
+
+          // Fetch postcards from invited private collections
+          const invitedFoliosQuery = query(
+            collection(db, 'folios'),
+            where('allowedUsers', 'array-contains', auth.currentUser.email),
+            limit(10)
+          );
+          const invitedFoliosSnap = await getDocs(invitedFoliosQuery);
+          const invitedFolioIds = invitedFoliosSnap.docs.map(doc => doc.id);
+
+          let invitedPostcards: any[] = [];
+          if (invitedFolioIds.length > 0) {
+            const chunks = [];
+            for (let i = 0; i < invitedFolioIds.length; i += 10) {
+              chunks.push(invitedFolioIds.slice(i, i + 10));
+            }
+            for (const chunk of chunks) {
+              const q = query(
+                collection(db, 'postcards'),
+                where('folioId', 'in', chunk),
+                orderBy('createdAt', 'desc'),
+                limit(10)
+              );
+              const snap = await getDocs(q);
+              invitedPostcards.push(...snap.docs.map(doc => ({ 
+                id: doc.id, 
+                ...doc.data(),
+                date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+              })));
+            }
+          }
+
+          // Combine and sort by date
+          const combined = [...followedPostcards, ...invitedPostcards]
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          
+          setFeedPostcards(combined);
+        }
+
       } catch (err) {
         console.error('Error fetching explore data:', err);
+        setError('Failed to load explore data. Please try again later.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchExploreData();
-  }, []);
+  }, [user]);
 
   const filteredFolios = publicFolios.filter(folio => 
     folio.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -81,6 +177,22 @@ export const Explore = () => {
 
   return (
     <div className="min-h-screen bg-canvas pb-24">
+      <Navbar 
+        user={user} 
+        onLogin={() => setIsOnboarding(true)} 
+        onLogout={handleLogout} 
+        onCreate={handleCreate} 
+      />
+
+      <AnimatePresence>
+        {isOnboarding && (
+          <Onboarding 
+            onClose={() => setIsOnboarding(false)}
+            onSuccess={() => setIsOnboarding(false)}
+          />
+        )}
+      </AnimatePresence>
+      
       {/* Navigation Bar / Breadcrumb */}
       <div className="max-w-7xl mx-auto px-6 pt-12 flex items-center justify-between">
         <Link 
@@ -134,6 +246,11 @@ export const Explore = () => {
 
       {/* Content */}
       <main className="max-w-7xl mx-auto px-6 space-y-32">
+        {error && (
+          <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-center italic editorial-text">
+            {error}
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-32">
             <Loader2 className="animate-spin text-sage" size={32} />
@@ -207,6 +324,35 @@ export const Explore = () => {
               )}
             </section>
 
+            {/* Personalized Feed */}
+            {user && feedPostcards.length > 0 && !searchQuery && (
+              <section className="space-y-12">
+                <div className="flex items-baseline justify-between border-b border-charcoal/5 pb-4">
+                  <h2 className="text-xs font-bold uppercase tracking-[0.3em] text-charcoal/30">Your Feed</h2>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-charcoal/20">
+                    Recent from curators you follow
+                  </div>
+                </div>
+
+                <div className="space-y-24">
+                  {feedPostcards.map((postcard) => (
+                    <Postcard 
+                      key={postcard.id}
+                      id={postcard.id}
+                      creatorId={postcard.creatorId}
+                      folioId={postcard.folioId}
+                      mediaUrls={postcard.mediaUrls}
+                      caption={postcard.caption}
+                      location={postcard.location}
+                      date={postcard.date}
+                      musicTrack={postcard.musicTrack}
+                      isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* About Section */}
             <section className="py-24 border-t border-charcoal/5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
@@ -241,8 +387,11 @@ export const Explore = () => {
       </main>
 
       <footer className="max-w-7xl mx-auto px-6 py-12 border-t border-charcoal/5 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/20">
-          &copy; 2026 Folio &mdash; The Discovery Engine
+        <div className="flex flex-col items-center md:items-start gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/20">
+            &copy; 2026 Folio &mdash; The Discovery Engine
+          </div>
+          <Seeder />
         </div>
         <div className="flex gap-8 text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40">
           <Link to="/" className="hover:text-charcoal transition-colors">Home</Link>

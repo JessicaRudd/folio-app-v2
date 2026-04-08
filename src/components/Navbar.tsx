@@ -1,7 +1,8 @@
-import { User, Plus, LogIn, LogOut, UserCircle, Globe, MapPin, Search } from 'lucide-react';
+import { User, Plus, LogIn, LogOut, UserCircle, Globe, MapPin, Search, Bell } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import React, { useState } from 'react';
+import { Notifications } from './Notifications';
 
 interface NavbarProps {
   user: any;
@@ -33,7 +34,7 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate }: NavbarProps) => {
           <h1 className="text-2xl font-serif tracking-tighter">Folio</h1>
         </Link>
 
-        <div className="hidden lg:flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-6">
           <Link 
             to="/explore" 
             className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-colors ${location.pathname === '/explore' ? 'text-sage' : 'text-charcoal/40 hover:text-charcoal'}`}
@@ -67,6 +68,7 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate }: NavbarProps) => {
       <div className="flex items-center gap-4">
         {user ? (
           <>
+            <Notifications />
             <Button variant="outline" size="sm" onClick={onCreate} className="hidden md:flex gap-2">
               <Plus size={16} />
               New Postcard

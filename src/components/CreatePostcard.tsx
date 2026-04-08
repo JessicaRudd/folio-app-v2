@@ -42,22 +42,71 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [userStats, setUserStats] = useState<any>(null);
+
   useEffect(() => {
-    const fetchFolios = async () => {
+    const fetchUserData = async () => {
       if (!auth.currentUser) return;
       try {
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (userDoc.exists()) {
+          setUserStats(userDoc.data());
+        }
+        
         const q = query(collection(db, 'folios'), where('creatorId', '==', auth.currentUser.uid));
         const querySnapshot = await getDocs(q);
         const fetchedFolios = querySnapshot.docs.map(doc => ({ id: doc.id, title: doc.data().title }));
         setFolios(fetchedFolios);
       } catch (err) {
-        console.error('Error fetching folios:', err);
+        console.error('Error fetching user data:', err);
       }
     };
-    fetchFolios();
+    fetchUserData();
   }, []);
+
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas to Blob failed'));
+          }, 'image/jpeg', 0.7); // 70% quality
+        };
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
   const extractExifData = (file: File) => {
     if (!file.type.startsWith('image/')) return;
@@ -72,6 +121,7 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
       if (lat && lon) {
         const latitude = (lat[0] + lat[1]/60 + lat[2]/3600) * (latRef === "N" ? 1 : -1);
         const longitude = (lon[0] + lon[1]/60 + lon[2]/3600) * (lonRef === "E" ? 1 : -1);
+        setCoordinates({ lat: latitude, lng: longitude });
         
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
           .then(res => res.json())
@@ -107,13 +157,21 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
-      setMediaFiles(prev => [...prev, ...files]);
-      const urls = files.map(file => URL.createObjectURL(file as Blob));
-      setPreviewUrls(prev => [...prev, ...urls]);
-      
-      // Try to extract metadata from the first photo
-      if (mediaFiles.length === 0) {
-        extractExifData(files[0] as File);
+      const totalFiles = mediaFiles.length + files.length;
+      if (totalFiles > 5) {
+        alert('Free accounts are limited to 5 photos per postcard.');
+        const allowedFiles = files.slice(0, 5 - mediaFiles.length);
+        if (allowedFiles.length === 0) return;
+        
+        setMediaFiles(prev => [...prev, ...allowedFiles]);
+        const urls = allowedFiles.map(file => URL.createObjectURL(file as Blob));
+        setPreviewUrls(prev => [...prev, ...urls]);
+        if (mediaFiles.length === 0) extractExifData(allowedFiles[0] as File);
+      } else {
+        setMediaFiles(prev => [...prev, ...files]);
+        const urls = files.map(file => URL.createObjectURL(file as Blob));
+        setPreviewUrls(prev => [...prev, ...urls]);
+        if (mediaFiles.length === 0) extractExifData(files[0] as File);
       }
       
       setStep(2);
@@ -126,6 +184,7 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
+        setCoordinates({ lat: latitude, lng: longitude });
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
           .then(res => res.json())
           .then(data => {
@@ -145,6 +204,7 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
 
   const handleLocationChange = (val: string) => {
     setLocation(val);
+    setCoordinates(null); // Reset coordinates if manually typing
     
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -173,6 +233,7 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
 
   const selectLocation = (suggestion: any) => {
     setLocation(suggestion.display_name);
+    setCoordinates({ lat: parseFloat(suggestion.lat), lng: parseFloat(suggestion.lon) });
     setShowSuggestions(false);
     setLocationSuggestions([]);
   };
@@ -188,20 +249,30 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
   const handleSubmit = async () => {
     if (mediaFiles.length === 0 || !auth.currentUser) return;
 
+    // Check Limits
+    const isAdmin = userStats?.role === 'admin';
+    if (!isAdmin) {
+      if (isCreatingNewFolio && (userStats?.total_folio_count || 0) >= 10) {
+        alert('Free accounts are limited to 10 collections. Upgrade to Folio Premium for unlimited collections.');
+        return;
+      }
+      if ((userStats?.total_postcard_count || 0) >= 100) {
+        alert('Free accounts are limited to 100 postcards. Upgrade to Folio Premium for unlimited postcards.');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       let finalFolioId = selectedFolioId;
 
       // 1. Create New Folio if needed
       if (isCreatingNewFolio && newFolioTitle.trim()) {
-        const userDoc = await getDoc(doc(db, 'users', auth.currentUser!.uid));
-        const userData = userDoc.data();
-        
         const folioDoc = await addDoc(collection(db, 'folios'), {
           title: newFolioTitle.trim(),
           creatorId: auth.currentUser!.uid,
-          creatorName: userData?.displayName || auth.currentUser!.displayName || '',
-          creatorUsername: userData?.username || '',
+          creatorName: userStats?.displayName || auth.currentUser!.displayName || '',
+          creatorUsername: userStats?.username || '',
           createdAt: serverTimestamp(),
           folioDate: postcardDate,
           postcardCount: 0,
@@ -209,13 +280,27 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
           privacy: 'private'
         });
         finalFolioId = folioDoc.id;
+        
+        // Increment Folio Count
+        await updateDoc(doc(db, 'users', auth.currentUser!.uid), {
+          total_folio_count: increment(1)
+        });
       }
 
-      // 2. Upload All Media
-      console.log('Uploading media...');
+      // 2. Upload All Media (with compression)
+      console.log('Compressing and uploading media...');
       const uploadPromises = mediaFiles.map(async (file) => {
+        let uploadData: Blob | File = file;
+        if (file.type.startsWith('image/')) {
+          try {
+            uploadData = await compressImage(file);
+          } catch (e) {
+            console.error('Compression failed, uploading original:', e);
+          }
+        }
+        
         const storageRef = ref(storage, `postcards/${auth.currentUser!.uid}/${Date.now()}_${file.name}`);
-        const uploadResult = await uploadBytes(storageRef, file);
+        const uploadResult = await uploadBytes(storageRef, uploadData);
         return getDownloadURL(uploadResult.ref);
       });
       const downloadUrls = await Promise.all(uploadPromises);
@@ -231,6 +316,8 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
           mediaUrls: downloadUrls,
           caption,
           location,
+          lat: coordinates?.lat || null,
+          lng: coordinates?.lng || null,
           musicTrack: selectedTrack,
           secureToken,
           createdAt: serverTimestamp(),
@@ -238,7 +325,12 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
           visibilityList: [], 
         });
 
-        // 4. Update Folio Metadata
+        // 4. Update Metadata
+        const userRef = doc(db, 'users', auth.currentUser!.uid);
+        await updateDoc(userRef, {
+          total_postcard_count: increment(1)
+        });
+
         if (finalFolioId !== 'loose-leaves') {
           const folioRef = doc(db, 'folios', finalFolioId);
           const updates: any = {

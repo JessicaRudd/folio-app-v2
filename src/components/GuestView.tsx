@@ -11,6 +11,7 @@ export const GuestView = () => {
   const navigate = useNavigate();
   const [postcards, setPostcards] = useState<any[]>([]);
   const [folio, setFolio] = useState<any>(null);
+  const [creator, setCreator] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -22,7 +23,14 @@ export const GuestView = () => {
         // 1. Fetch Folio Metadata
         const folioDoc = await getDoc(doc(db, 'folios', folioId));
         if (folioDoc.exists()) {
-          setFolio(folioDoc.data());
+          const folioData = folioDoc.data();
+          setFolio(folioData);
+          
+          // Fetch Creator Data for Premium Status
+          const creatorDoc = await getDoc(doc(db, 'users', folioData.creatorId));
+          if (creatorDoc.exists()) {
+            setCreator(creatorDoc.data());
+          }
         }
 
         // 2. Fetch Postcards
@@ -126,12 +134,14 @@ export const GuestView = () => {
             <Postcard 
               key={postcard.id} 
               id={postcard.id}
+              creatorId={postcard.creatorId}
               folioId={postcard.folioId}
               mediaUrls={postcard.mediaUrls}
               caption={postcard.caption}
               location={postcard.location}
               date={postcard.date}
               musicTrack={postcard.musicTrack}
+              isPremium={creator?.isPremium || creator?.role === 'admin'}
             />
           ))}
         </div>

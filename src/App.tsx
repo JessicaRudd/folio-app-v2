@@ -10,12 +10,13 @@ import { ProfilePage } from './components/ProfilePage';
 import { PublicProfile } from './components/PublicProfile';
 import { Explore } from './components/Explore';
 import { MapView } from './components/MapView';
+import { Onboarding } from './components/Onboarding';
 import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Share2, Settings } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, getDoc, doc } from 'firebase/firestore';
 
 // Mock Data for initial view
 const MOCK_FOLIOS = [
@@ -31,10 +32,12 @@ const MOCK_FOLIOS = [
 
 function CreatorDashboard() {
   const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [selectedFolioId, setSelectedFolioId] = useState<string | null>(null);
   const [view, setView] = useState<'grid' | 'postcard'>('grid');
   const [isCreating, setIsCreating] = useState(false);
   const [isEditingFolio, setIsEditingFolio] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(false);
   const [realPostcards, setRealPostcards] = useState<any[]>([]);
   const [realFolios, setRealFolios] = useState<any[]>([]);
   const [looseStats, setLooseStats] = useState({ postcards: 0, photos: 0 });
@@ -42,6 +45,11 @@ function CreatorDashboard() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      if (user) {
+        getDoc(doc(db, 'users', user.uid)).then(snap => {
+          if (snap.exists()) setUserProfile(snap.data());
+        });
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -133,15 +141,6 @@ function CreatorDashboard() {
     return () => unsubscribe();
   }, [selectedFolioId, user]);
 
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error('Login failed:', error);
-    }
-  };
-
   const handleLogout = () => signOut(auth);
 
   const selectedFolio = realFolios.find(f => f.id === selectedFolioId);
@@ -150,7 +149,7 @@ function CreatorDashboard() {
     <div className="min-h-screen flex flex-col">
       <Navbar 
         user={user} 
-        onLogin={handleLogin} 
+        onLogin={() => setIsOnboarding(true)} 
         onLogout={handleLogout} 
         onCreate={() => setIsCreating(true)} 
       />
@@ -189,7 +188,7 @@ function CreatorDashboard() {
               ) : (
                 <div className="text-center py-20">
                   <p className="text-charcoal/40 italic mb-8">Login to view your private collections.</p>
-                  <Button variant="primary" onClick={handleLogin}>Get Started</Button>
+                  <Button variant="primary" onClick={() => setIsOnboarding(true)}>Get Started</Button>
                 </div>
               )}
             </motion.div>
@@ -257,12 +256,14 @@ function CreatorDashboard() {
                     <Postcard 
                       key={postcard.id} 
                       id={postcard.id}
+                      creatorId={postcard.creatorId}
                       folioId={postcard.folioId}
                       mediaUrls={postcard.mediaUrls}
                       caption={postcard.caption}
                       location={postcard.location}
                       date={postcard.date}
                       musicTrack={postcard.musicTrack}
+                      isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
                     />
                   ))
                 )}
@@ -271,6 +272,15 @@ function CreatorDashboard() {
           )}
         </AnimatePresence>
       </main>
+
+      <AnimatePresence>
+        {isOnboarding && (
+          <Onboarding 
+            onClose={() => setIsOnboarding(false)}
+            onSuccess={() => setIsOnboarding(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isCreating && (
