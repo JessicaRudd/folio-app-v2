@@ -1,0 +1,435 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  X, 
+  Globe, 
+  Lock, 
+  UserPlus, 
+  Mail, 
+  Copy, 
+  Check, 
+  Trash2, 
+  ShieldCheck, 
+  Loader2,
+  ExternalLink,
+  Users
+} from 'lucide-react';
+import { Button } from './ui/Button';
+import { db, auth } from '../lib/firebase';
+import { 
+  doc, 
+  updateDoc, 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  onSnapshot, 
+  deleteDoc,
+  serverTimestamp,
+  getDocs,
+  getDoc
+} from 'firebase/firestore';
+import { cn } from '../lib/utils';
+
+interface ShareModalProps {
+  folio: any;
+  onClose: () => void;
+}
+
+export const ShareModal: React.FC<ShareModalProps> = ({ folio, onClose }) => {
+  const [activeTab, setActiveTab] = useState<'public' | 'private' | 'curators'>('public');
+  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [shares, setShares] = useState<any[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteType, setInviteType] = useState<'guest' | 'curator'>('guest');
+
+  const publicUrl = `${window.location.origin}/s/${folio.id}`;
+
+  useEffect(() => {
+    const q = query(
+      collection(db, 'shares'),
+      where('folioId', '==', folio.id)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      setShares(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, [folio.id]);
+
+  const togglePublic = async () => {
+    setLoading(true);
+    try {
+      const newVisibility = folio.visibility === 'public' ? 'private' : 'public';
+      await updateDoc(doc(db, 'folios', folio.id), {
+        visibility: newVisibility
+      });
+
+      // Update denormalized fields in postcards
+      const postcardsQuery = query(collection(db, 'postcards'), where('folioId', '==', folio.id));
+      const postcardsSnap = await getDocs(postcardsQuery);
+      
+      if (!postcardsSnap.empty) {
+        const { writeBatch } = await import('firebase/firestore');
+        const batch = writeBatch(db);
+        postcardsSnap.docs.forEach(p => {
+          batch.update(p.ref, {
+            folioVisibility: newVisibility
+          });
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error('Error toggling visibility:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyLink = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const createShare = async () => {
+    if (!inviteEmail.trim()) return;
+    setLoading(true);
+    try {
+      if (inviteType === 'curator') {
+        // Find user by email
+        const userQuery = query(collection(db, 'users'), where('email', '==', inviteEmail.trim()));
+        const userSnap = await getDocs(userQuery);
+        
+        if (userSnap.empty) {
+          alert('User not found. Curators must have a Folio account.');
+          return;
+        }
+
+        const targetUid = userSnap.docs[0].id;
+        const currentCurators = folio.curators || [];
+        if (!currentCurators.includes(targetUid)) {
+          await updateDoc(doc(db, 'folios', folio.id), {
+            curators: [...currentCurators, targetUid]
+          });
+        }
+      } else {
+        // Create Guest Share
+        await addDoc(collection(db, 'shares'), {
+          folioId: folio.id,
+          type: 'guest',
+          email: inviteEmail.trim(),
+          status: 'active',
+          createdAt: serverTimestamp(),
+          accessedBy: []
+        });
+      }
+      setInviteEmail('');
+    } catch (err) {
+      console.error('Error creating share:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const revokeShare = async (shareId: string) => {
+    try {
+      await deleteDoc(doc(db, 'shares', shareId));
+    } catch (err) {
+      console.error('Error revoking share:', err);
+    }
+  };
+
+  const removeCurator = async (uid: string) => {
+    try {
+      const currentCurators = folio.curators || [];
+      await updateDoc(doc(db, 'folios', folio.id), {
+        curators: currentCurators.filter((id: string) => id !== uid)
+      });
+    } catch (err) {
+      console.error('Error removing curator:', err);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-charcoal/40 backdrop-blur-sm"
+      />
+      
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+      >
+        <div className="p-8 space-y-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-3xl font-serif">Share Collection</h2>
+            <button onClick={onClose} className="p-2 hover:bg-canvas rounded-full transition-colors">
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="flex gap-1 p-1 bg-canvas rounded-xl">
+            {(['public', 'private', 'curators'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "flex-1 py-2 text-xs font-bold uppercase tracking-widest rounded-lg transition-all",
+                  activeTab === tab ? "bg-white text-sage shadow-sm" : "text-charcoal/40 hover:text-charcoal"
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          <AnimatePresence mode="wait">
+            {activeTab === 'public' && (
+              <motion.div
+                key="public"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <div className="flex items-center justify-between p-4 bg-canvas rounded-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-2 rounded-lg",
+                      folio.visibility === 'public' ? "bg-sage/10 text-sage" : "bg-charcoal/5 text-charcoal/40"
+                    )}>
+                      <Globe size={20} />
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm">Public Link</div>
+                      <div className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">
+                        {folio.visibility === 'public' ? 'Enabled' : 'Disabled'}
+                      </div>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={togglePublic}
+                    disabled={loading}
+                    className={cn(
+                      "w-12 h-6 rounded-full transition-colors relative",
+                      folio.visibility === 'public' ? "bg-sage" : "bg-charcoal/20"
+                    )}
+                  >
+                    <div className={cn(
+                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                      folio.visibility === 'public' ? "left-7" : "left-1"
+                    )} />
+                  </button>
+                </div>
+
+                {folio.visibility === 'public' ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-sage/5 border border-sage/10 rounded-2xl flex items-center justify-between gap-4">
+                      <div className="flex-1 truncate text-sm text-sage font-mono">
+                        {publicUrl}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => copyLink(publicUrl)}>
+                        {copied ? <Check size={16} className="text-sage" /> : <Copy size={16} />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-charcoal/40 italic text-center">
+                      Warning: Anyone with this link can view this collection.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 space-y-4">
+                    <div className="w-16 h-16 bg-canvas rounded-full flex items-center justify-center mx-auto text-charcoal/20">
+                      <Lock size={32} />
+                    </div>
+                    <p className="text-sm text-charcoal/60 max-w-xs mx-auto">
+                      Enable public sharing to generate a frictionless link for anyone to view.
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'private' && (
+              <motion.div
+                key="private"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30" size={18} />
+                      <input 
+                        type="email"
+                        placeholder="guest@email.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-canvas rounded-xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all"
+                      />
+                    </div>
+                    <Button 
+                      variant="primary" 
+                      onClick={() => {
+                        setInviteType('guest');
+                        createShare();
+                      }}
+                      disabled={loading || !inviteEmail}
+                    >
+                      {loading ? <Loader2 className="animate-spin" size={18} /> : 'Invite'}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold text-center">
+                    Generates a private, OTP-protected link
+                  </p>
+                </div>
+
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Guest List</h3>
+                  {shares.filter(s => s.type === 'guest').length === 0 ? (
+                    <div className="text-center py-8 text-charcoal/20 italic text-sm">
+                      No guests invited yet.
+                    </div>
+                  ) : (
+                    shares.filter(s => s.type === 'guest').map((share) => (
+                      <div key={share.id} className="flex items-center justify-between p-3 bg-canvas rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-white rounded-lg text-sage shadow-sm">
+                            <ShieldCheck size={16} />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold">{share.email}</div>
+                            <div className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">
+                              {share.accessedBy?.length || 0} Accesses
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/v/${share.id}`)}>
+                            <Copy size={16} />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => revokeShare(share.id)}>
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'curators' && (
+              <motion.div
+                key="curators"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30" size={18} />
+                      <input 
+                        type="email"
+                        placeholder="curator@folio.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 bg-canvas rounded-xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all"
+                      />
+                    </div>
+                    <Button 
+                      variant="primary" 
+                      onClick={() => {
+                        setInviteType('curator');
+                        createShare();
+                      }}
+                      disabled={loading || !inviteEmail}
+                    >
+                      {loading ? <Loader2 className="animate-spin" size={18} /> : 'Add'}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold text-center">
+                    Full edit & share rights for registered users
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Active Curators</h3>
+                  <div className="space-y-2">
+                    {/* Owner */}
+                    <div className="flex items-center justify-between p-3 bg-sage/5 border border-sage/10 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-sage text-white rounded-full flex items-center justify-center font-bold text-xs">
+                          O
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">Owner</div>
+                          <div className="text-[10px] text-sage uppercase tracking-widest font-bold">Full Access</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Other Curators */}
+                    {(folio.curators || []).map((uid: string) => (
+                      <CuratorItem key={uid} uid={uid} onRemove={() => removeCurator(uid)} />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+interface CuratorItemProps {
+  uid: string;
+  onRemove: () => void;
+}
+
+const CuratorItem: React.FC<CuratorItemProps> = ({ uid, onRemove }) => {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, 'users', uid)).then(snap => {
+      if (snap.exists()) setUser(snap.data());
+    });
+  }, [uid]);
+
+  if (!user) return null;
+
+  return (
+    <div className="flex items-center justify-between p-3 bg-canvas rounded-xl">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full overflow-hidden bg-white">
+          {user.photoURL ? (
+            <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-charcoal/20">
+              <Users size={16} />
+            </div>
+          )}
+        </div>
+        <div>
+          <div className="text-sm font-bold">{user.displayName || 'Folio User'}</div>
+          <div className="text-[10px] text-charcoal/40 uppercase tracking-widest font-bold">Curator</div>
+        </div>
+      </div>
+      <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={onRemove}>
+        <Trash2 size={16} />
+      </Button>
+    </div>
+  );
+};

@@ -11,6 +11,7 @@ import EXIF from 'exif-js';
 interface CreatePostcardProps {
   onClose: () => void;
   onSuccess: () => void;
+  onLimitReached?: (type: 'folios' | 'postcards' | 'photos') => void;
 }
 
 interface Folio {
@@ -18,7 +19,7 @@ interface Folio {
   title: string;
 }
 
-export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
+export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePostcardProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -159,7 +160,11 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
     if (files.length > 0) {
       const totalFiles = mediaFiles.length + files.length;
       if (totalFiles > 5) {
-        alert('Free accounts are limited to 5 photos per postcard.');
+        if (onLimitReached) {
+          onLimitReached('photos');
+        } else {
+          alert('Free accounts are limited to 5 photos per postcard.');
+        }
         const allowedFiles = files.slice(0, 5 - mediaFiles.length);
         if (allowedFiles.length === 0) return;
         
@@ -251,13 +256,16 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
 
     // Check Limits
     const isAdmin = userStats?.role === 'admin';
-    if (!isAdmin) {
+    const isPremium = userStats?.isPremium;
+    if (!isAdmin && !isPremium) {
       if (isCreatingNewFolio && (userStats?.total_folio_count || 0) >= 10) {
-        alert('Free accounts are limited to 10 collections. Upgrade to Folio Premium for unlimited collections.');
+        if (onLimitReached) onLimitReached('folios');
+        else alert('Free accounts are limited to 10 collections.');
         return;
       }
       if ((userStats?.total_postcard_count || 0) >= 100) {
-        alert('Free accounts are limited to 100 postcards. Upgrade to Folio Premium for unlimited postcards.');
+        if (onLimitReached) onLimitReached('postcards');
+        else alert('Free accounts are limited to 100 postcards.');
         return;
       }
     }
@@ -277,7 +285,9 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
           folioDate: postcardDate,
           postcardCount: 0,
           photoCount: 0,
-          privacy: 'private'
+          privacy: 'private',
+          visibility: 'private',
+          curators: []
         });
         finalFolioId = folioDoc.id;
         
@@ -309,6 +319,18 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
       // 3. Create Postcard Doc
       const secureToken = crypto.randomUUID();
       console.log('Creating Firestore document...');
+      
+      // Get folio visibility for denormalization
+      let folioVisibility = 'private';
+      let folioPrivacy = 'private';
+      if (finalFolioId !== 'loose-leaves') {
+        const folioSnap = await getDoc(doc(db, 'folios', finalFolioId));
+        if (folioSnap.exists()) {
+          folioVisibility = folioSnap.data().visibility || 'private';
+          folioPrivacy = folioSnap.data().privacy || 'private';
+        }
+      }
+
       try {
         await addDoc(collection(db, 'postcards'), {
           folioId: finalFolioId,
@@ -323,6 +345,8 @@ export const CreatePostcard = ({ onClose, onSuccess }: CreatePostcardProps) => {
           createdAt: serverTimestamp(),
           postcardDate: postcardDate,
           visibilityList: [], 
+          folioVisibility,
+          folioPrivacy
         });
 
         // 4. Update Metadata

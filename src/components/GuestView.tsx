@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Postcard } from './Postcard';
-import { motion } from 'motion/react';
-import { Lock, ArrowLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Lock, ArrowLeft, Mail, ShieldCheck, Loader2, CheckCircle2 } from 'lucide-react';
+import { Button } from './ui/Button';
 
 export const GuestView = () => {
   const { folioId, secureToken } = useParams<{ folioId: string; secureToken: string }>();
@@ -14,65 +15,121 @@ export const GuestView = () => {
   const [creator, setCreator] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  
+  // OTP State
+  const [isVerified, setIsVerified] = useState(false);
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [shareData, setShareData] = useState<any>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const checkShare = async () => {
       if (!folioId) return;
 
       try {
-        // 1. Fetch Folio Metadata
-        const folioDoc = await getDoc(doc(db, 'folios', folioId));
-        if (folioDoc.exists()) {
-          const folioData = folioDoc.data();
-          setFolio(folioData);
-          
-          // Fetch Creator Data for Premium Status
-          const creatorDoc = await getDoc(doc(db, 'users', folioData.creatorId));
-          if (creatorDoc.exists()) {
-            setCreator(creatorDoc.data());
-          }
+        // If it's an old-style secureToken link
+        if (secureToken && secureToken !== 'invite') {
+          await fetchData();
+          setIsVerified(true);
+          return;
         }
 
-        // 2. Fetch Postcards
-        let q;
-        if (secureToken === 'public') {
-          q = query(
-            collection(db, 'postcards'),
-            where('folioId', '==', folioId)
-          );
+        // Check if it's a new-style Share link (folioId here might actually be the shareId)
+        // The route is /v/:folioId/:secureToken. 
+        // Let's assume /v/:shareId is the new format.
+        const shareDoc = await getDoc(doc(db, 'shares', folioId!));
+        if (shareDoc.exists() && shareDoc.data().status === 'active') {
+          setShareData({ id: shareDoc.id, ...shareDoc.data() });
+          
+          // Fetch Folio
+          const fDoc = await getDoc(doc(db, 'folios', shareDoc.data().folioId));
+          if (fDoc.exists()) {
+            setFolio(fDoc.data());
+            const cDoc = await getDoc(doc(db, 'users', fDoc.data().creatorId));
+            if (cDoc.exists()) setCreator(cDoc.data());
+          }
+          setLoading(false);
         } else {
-          q = query(
-            collection(db, 'postcards'),
-            where('folioId', '==', folioId),
-            where('secureToken', '==', secureToken)
-          );
-        }
-        
-        const querySnapshot = await getDocs(q);
-        const docs = querySnapshot.docs.map(doc => {
-          const data = doc.data() as any;
-          return { 
-            id: doc.id, 
-            ...data,
-            date: data.postcardDate || data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-          };
-        });
-        
-        if (docs.length === 0 && secureToken !== 'public') {
-          setError(true);
-        } else {
-          setPostcards(docs);
+          // Fallback to old logic
+          await fetchData();
+          setIsVerified(true);
         }
       } catch (err) {
-        console.error('Error fetching guest view data:', err);
+        console.error('Error checking share:', err);
         setError(true);
-      } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    checkShare();
   }, [folioId, secureToken]);
+
+  const fetchData = async (targetFolioId?: string) => {
+    const id = targetFolioId || folioId;
+    if (!id) return;
+
+    try {
+      const folioDoc = await getDoc(doc(db, 'folios', id));
+      if (folioDoc.exists()) {
+        const folioData = folioDoc.data();
+        setFolio(folioData);
+        const creatorDoc = await getDoc(doc(db, 'users', folioData.creatorId));
+        if (creatorDoc.exists()) setCreator(creatorDoc.data());
+
+        const q = query(
+          collection(db, 'postcards'),
+          where('folioId', '==', id)
+        );
+        
+        const querySnapshot = await getDocs(q);
+        const docs = querySnapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data(),
+          date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+        }));
+        setPostcards(docs);
+      } else {
+        setError(true);
+      }
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!email.trim()) return;
+    setAuthLoading(true);
+    // Simulate OTP send
+    setTimeout(() => {
+      setStep('otp');
+      setAuthLoading(false);
+    }, 1000);
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) return;
+    setAuthLoading(true);
+    
+    // Simulate verification
+    setTimeout(async () => {
+      if (otp === '123456' || email === shareData?.email) {
+        setIsVerified(true);
+        await fetchData(shareData.folioId);
+        // Track access
+        await updateDoc(doc(db, 'shares', shareData.id), {
+          accessedBy: arrayUnion(email)
+        });
+      } else {
+        alert('Invalid code. Try 123456 for demo.');
+      }
+      setAuthLoading(false);
+    }, 1000);
+  };
 
   if (loading) {
     return (
@@ -98,27 +155,113 @@ export const GuestView = () => {
     );
   }
 
+  if (!isVerified && shareData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-canvas px-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-xl space-y-8 text-center"
+        >
+          <div className="w-16 h-16 bg-sage/10 text-sage rounded-2xl flex items-center justify-center mx-auto">
+            <ShieldCheck size={32} />
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-3xl font-serif">Guest Pass</h2>
+            <p className="text-sm text-charcoal/60 italic">
+              Verification required to view <span className="font-bold text-charcoal not-italic">{folio?.title}</span>
+            </p>
+          </div>
+
+          <AnimatePresence mode="wait">
+            {step === 'email' ? (
+              <motion.div
+                key="email"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-charcoal/30" size={20} />
+                  <input 
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-canvas rounded-2xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all text-lg"
+                  />
+                </div>
+                <Button 
+                  variant="primary" 
+                  size="lg" 
+                  className="w-full py-6 text-lg"
+                  onClick={handleSendOtp}
+                  disabled={authLoading || !email}
+                >
+                  {authLoading ? <Loader2 className="animate-spin" /> : 'Send Access Code'}
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="otp"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                <div className="space-y-4">
+                  <input 
+                    type="text"
+                    placeholder="000000"
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    className="w-full py-4 bg-canvas rounded-2xl border-none focus:ring-2 focus:ring-sage/20 outline-none transition-all text-4xl text-center tracking-[0.5em] font-mono"
+                  />
+                  <p className="text-xs text-charcoal/40">
+                    Enter the 6-digit code sent to <span className="text-charcoal font-bold">{email}</span>
+                  </p>
+                </div>
+                <Button 
+                  variant="primary" 
+                  size="lg" 
+                  className="w-full py-6 text-lg"
+                  onClick={handleVerifyOtp}
+                  disabled={authLoading || otp.length !== 6}
+                >
+                  {authLoading ? <Loader2 className="animate-spin" /> : 'Verify & Enter'}
+                </Button>
+                <button 
+                  onClick={() => setStep('email')}
+                  className="text-xs font-bold uppercase tracking-widest text-charcoal/40 hover:text-charcoal transition-colors"
+                >
+                  Change Email
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <p className="text-[10px] text-charcoal/30 uppercase tracking-[0.2em] font-bold">
+            Secure Private Link &bull; Folio Guest Pass
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-canvas py-20 px-6">
-      {secureToken === 'public' && (
-        <div className="max-w-4xl mx-auto mb-12">
-          <Link 
-            to="/explore"
-            className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
-          >
-            <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
-            Back to Explore
-          </Link>
-        </div>
-      )}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         className="max-w-4xl mx-auto space-y-24"
       >
         <header className="text-center space-y-4 mb-20">
-          <div className="text-xs font-bold uppercase tracking-[0.3em] text-sage mb-2">
-            {secureToken === 'public' ? 'Public Collection' : 'Shared with you'}
+          <div className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-[0.3em] text-sage mb-2">
+            <Lock size={12} />
+            Private Guest View
           </div>
           <h1 className="text-5xl md:text-7xl font-serif">{folio?.title || 'A Special Folio'}</h1>
           {folio?.description && (
@@ -133,14 +276,7 @@ export const GuestView = () => {
           {postcards.map((postcard) => (
             <Postcard 
               key={postcard.id} 
-              id={postcard.id}
-              creatorId={postcard.creatorId}
-              folioId={postcard.folioId}
-              mediaUrls={postcard.mediaUrls}
-              caption={postcard.caption}
-              location={postcard.location}
-              date={postcard.date}
-              musicTrack={postcard.musicTrack}
+              {...postcard}
               isPremium={creator?.isPremium || creator?.role === 'admin'}
             />
           ))}

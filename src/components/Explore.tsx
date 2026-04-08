@@ -23,6 +23,7 @@ export const Explore = () => {
   const [error, setError] = useState<string | null>(null);
   const [publicFolios, setPublicFolios] = useState<any[]>([]);
   const [publicCurators, setPublicCurators] = useState<any[]>([]);
+  const [publicPostcards, setPublicPostcards] = useState<any[]>([]);
   const [feedPostcards, setFeedPostcards] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [user, setUser] = useState<any>(null);
@@ -84,7 +85,26 @@ export const Explore = () => {
         }));
         setPublicCurators(curators);
 
-        // 3. Fetch Personalized Feed if logged in
+        // 3. Fetch Public Postcards (for everyone)
+        const publicPostcardsQuery = query(
+          collection(db, 'postcards'),
+          where('folioVisibility', '==', 'public'),
+          orderBy('createdAt', 'desc'),
+          limit(20)
+        );
+        try {
+          const publicPostcardsSnap = await getDocs(publicPostcardsQuery);
+          const publicPostcards = publicPostcardsSnap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+          }));
+          setPublicPostcards(publicPostcards);
+        } catch (err) {
+          handleFirestoreError(err, OperationType.LIST, 'postcards_public');
+        }
+
+        // 4. Fetch Personalized Feed if logged in
         if (auth.currentUser) {
           const followedIds = await socialService.getFollowedUserIds();
           
@@ -103,18 +123,23 @@ export const Explore = () => {
                 orderBy('createdAt', 'desc'),
                 limit(10)
               );
-              const snap = await getDocs(q);
-              followedPostcards.push(...snap.docs.map(doc => ({ 
-                id: doc.id, 
-                ...doc.data(),
-                date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-              })));
+              try {
+                const snap = await getDocs(q);
+                followedPostcards.push(...snap.docs.map(doc => ({ 
+                  id: doc.id, 
+                  ...doc.data(),
+                  date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+                })));
+              } catch (err) {
+                handleFirestoreError(err, OperationType.LIST, 'postcards_feed');
+              }
             }
           }
 
           // Fetch postcards from invited private collections
           const invitedFoliosQuery = query(
             collection(db, 'folios'),
+            where('privacy', '==', 'personal'),
             where('allowedUsers', 'array-contains', auth.currentUser.email),
             limit(10)
           );
@@ -134,12 +159,16 @@ export const Explore = () => {
                 orderBy('createdAt', 'desc'),
                 limit(10)
               );
-              const snap = await getDocs(q);
-              invitedPostcards.push(...snap.docs.map(doc => ({ 
-                id: doc.id, 
-                ...doc.data(),
-                date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-              })));
+              try {
+                const snap = await getDocs(q);
+                invitedPostcards.push(...snap.docs.map(doc => ({ 
+                  id: doc.id, 
+                  ...doc.data(),
+                  date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+                })));
+              } catch (err) {
+                handleFirestoreError(err, OperationType.LIST, 'postcards_invited');
+              }
             }
           }
 
@@ -323,6 +352,35 @@ export const Explore = () => {
                 />
               )}
             </section>
+
+            {/* Global Gallery (Public Postcards) */}
+            {publicPostcards.length > 0 && !searchQuery && (
+              <section className="space-y-12">
+                <div className="flex items-baseline justify-between border-b border-charcoal/5 pb-4">
+                  <h2 className="text-xs font-bold uppercase tracking-[0.3em] text-charcoal/30">Global Gallery</h2>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-charcoal/20">
+                    Moments from public collections
+                  </div>
+                </div>
+
+                <div className="space-y-24">
+                  {publicPostcards.map((postcard) => (
+                    <Postcard 
+                      key={postcard.id}
+                      id={postcard.id}
+                      creatorId={postcard.creatorId}
+                      folioId={postcard.folioId}
+                      mediaUrls={postcard.mediaUrls}
+                      caption={postcard.caption}
+                      location={postcard.location}
+                      date={postcard.date}
+                      musicTrack={postcard.musicTrack}
+                      isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Personalized Feed */}
             {user && feedPostcards.length > 0 && !searchQuery && (

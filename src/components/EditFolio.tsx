@@ -15,6 +15,7 @@ interface EditFolioProps {
     coverImage: string;
     location?: string;
     privacy?: 'private' | 'personal' | 'public';
+    visibility?: 'private' | 'public';
     allowedUsers?: string[];
     folioDate?: string;
     postcardCount?: number;
@@ -34,6 +35,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
   const [location, setLocation] = useState(folio.location || '');
   const [folioDate, setFolioDate] = useState(folio.folioDate || new Date().toISOString().split('T')[0]);
   const [privacy, setPrivacy] = useState<'private' | 'personal' | 'public'>(folio.privacy || 'private');
+  const [visibility, setVisibility] = useState<'private' | 'public'>(folio.visibility || 'private');
   const [allowedUsers, setAllowedUsers] = useState<string[]>(folio.allowedUsers || []);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -61,8 +63,7 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
       // Fetch postcards to get photos for cover selection
       const q = query(
         collection(db, 'postcards'), 
-        where('folioId', '==', folio.id),
-        where('creatorId', '==', auth.currentUser.uid)
+        where('folioId', '==', folio.id)
       );
       const querySnapshot = await getDocs(q);
       const fetchedPostcards: any[] = [];
@@ -294,8 +295,21 @@ export const EditFolio = ({ folio, onClose, onSuccess }: EditFolioProps) => {
         folioDate,
         coverImage: finalCoverUrl,
         privacy,
+        visibility,
         allowedUsers: privacy === 'personal' ? allowedUsers : [],
       });
+
+      // Update denormalized fields in postcards
+      if (privacy !== folio.privacy || visibility !== folio.visibility) {
+        const batch = writeBatch(db);
+        postcards.forEach(p => {
+          batch.update(doc(db, 'postcards', p.id), {
+            folioPrivacy: privacy,
+            folioVisibility: visibility
+          });
+        });
+        await batch.commit();
+      }
 
       onSuccess();
     } catch (error) {

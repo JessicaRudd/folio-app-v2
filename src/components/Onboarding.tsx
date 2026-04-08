@@ -31,12 +31,13 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 interface OnboardingProps {
   onClose: () => void;
   onSuccess: () => void;
+  initialStep?: Step;
 }
 
 type Step = 'welcome' | 'concepts' | 'privacy' | 'auth-email' | 'auth-password' | 'auth-signup' | 'forgot-password';
 
-export const Onboarding = ({ onClose, onSuccess }: OnboardingProps) => {
-  const [step, setStep] = useState<Step>('welcome');
+export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps) => {
+  const [step, setStep] = useState<Step>(initialStep || 'welcome');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');

@@ -11,6 +11,8 @@ import { PublicProfile } from './components/PublicProfile';
 import { Explore } from './components/Explore';
 import { MapView } from './components/MapView';
 import { Onboarding } from './components/Onboarding';
+import { PublicFolioView } from './components/PublicFolioView';
+import { ShareModal } from './components/ShareModal';
 import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Share2, Settings } from 'lucide-react';
@@ -37,6 +39,7 @@ function CreatorDashboard() {
   const [view, setView] = useState<'grid' | 'postcard'>('grid');
   const [isCreating, setIsCreating] = useState(false);
   const [isEditingFolio, setIsEditingFolio] = useState(false);
+  const [isSharingFolio, setIsSharingFolio] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [realPostcards, setRealPostcards] = useState<any[]>([]);
   const [realFolios, setRealFolios] = useState<any[]>([]);
@@ -83,21 +86,36 @@ function CreatorDashboard() {
       return;
     }
 
-    const q = query(
+    // Query for folios created by user
+    const q1 = query(
       collection(db, 'folios'),
       where('creatorId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        folioDate: doc.data().folioDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-        createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-      }));
+    // Query for folios where user is a curator
+    const q2 = query(
+      collection(db, 'folios'),
+      where('curators', 'array-contains', user.uid)
+    );
+
+    let folios1: any[] = [];
+    let folios2: any[] = [];
+
+    const updateFolios = () => {
+      const combined = [...folios1];
+      folios2.forEach(f => {
+        if (!combined.some(c => c.id === f.id)) combined.push(f);
+      });
       
-      // Add "Loose Leaves" if it doesn't exist in the list
+      const sorted = combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      const docs = sorted.map(f => ({
+        ...f,
+        folioDate: f.folioDate || f.createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        createdAt: f.createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+      }));
+
       const hasLooseLeaves = docs.some(d => d.id === 'loose-leaves');
       const finalFolios = hasLooseLeaves ? docs : [
         {
@@ -111,9 +129,22 @@ function CreatorDashboard() {
         ...docs
       ];
       setRealFolios(finalFolios);
+    };
+
+    const unsub1 = onSnapshot(q1, (snap) => {
+      folios1 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateFolios();
     });
 
-    return () => unsubscribe();
+    const unsub2 = onSnapshot(q2, (snap) => {
+      folios2 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      updateFolios();
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
+    };
   }, [user]);
 
   // Fetch Postcards for selected folio
@@ -123,7 +154,6 @@ function CreatorDashboard() {
     const q = query(
       collection(db, 'postcards'),
       where('folioId', '==', selectedFolioId),
-      where('creatorId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
 
@@ -218,11 +248,7 @@ function CreatorDashboard() {
                         Edit Collection
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" className="gap-2" onClick={() => {
-                      const shareUrl = `${window.location.origin}/v/${selectedFolioId}/${realPostcards[0]?.secureToken || 'invite'}`;
-                      navigator.clipboard.writeText(shareUrl);
-                      alert('Share link copied to clipboard!');
-                    }}>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsSharingFolio(true)}>
                       <Share2 size={16} />
                       Share Folio
                     </Button>
@@ -301,6 +327,15 @@ function CreatorDashboard() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {isSharingFolio && selectedFolio && (
+          <ShareModal 
+            folio={selectedFolio}
+            onClose={() => setIsSharingFolio(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <footer className="py-12 border-t border-charcoal/5 text-center">
         <div className="text-charcoal/30 text-xs uppercase tracking-widest font-bold">
           &copy; 2026 Folio &mdash; Privacy First Sharing
@@ -319,7 +354,9 @@ export default function App() {
         <Route path="/u/:username" element={<PublicProfile />} />
         <Route path="/explore" element={<Explore />} />
         <Route path="/map" element={<MapView />} />
+        <Route path="/v/:folioId" element={<GuestView />} />
         <Route path="/v/:folioId/:secureToken" element={<GuestView />} />
+        <Route path="/s/:folioId" element={<PublicFolioView />} />
       </Routes>
     </Router>
   );

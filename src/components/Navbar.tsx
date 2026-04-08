@@ -1,12 +1,13 @@
-import { User, Plus, LogIn, LogOut, UserCircle, Globe, MapPin, Search, Bell } from 'lucide-react';
+import { User, Plus, LogIn, LogOut, UserCircle, Globe, MapPin, Search, Bell, Heart } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import React, { useState } from 'react';
 import { Notifications } from './Notifications';
+import { SUPPORT_URL } from '../constants';
 
 interface NavbarProps {
   user: any;
-  onLogin: () => void;
+  onLogin: (initialStep?: 'welcome' | 'auth-email') => void;
   onLogout: () => void;
   onCreate: () => void;
 }
@@ -66,6 +67,16 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate }: NavbarProps) => {
       </div>
 
       <div className="flex items-center gap-4">
+        <a 
+          href={SUPPORT_URL} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full bg-sage/5 text-sage hover:bg-sage/10 transition-colors text-xs font-bold uppercase tracking-widest"
+        >
+          <Heart size={14} className="fill-sage/20" />
+          Support Folio
+        </a>
+
         {user ? (
           <>
             <Notifications />
@@ -87,7 +98,7 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate }: NavbarProps) => {
             </div>
           </>
         ) : (
-          <Button variant="primary" size="sm" onClick={onLogin} className="gap-2">
+          <Button variant="primary" size="sm" onClick={() => onLogin('auth-email')} className="gap-2">
             <LogIn size={16} />
             Creator Login
           </Button>

@@ -102,7 +102,9 @@
         "description": { "type": "string" },
         "location": { "type": "string" },
         "coverImage": { "type": "string", "format": "uri" },
+        "visibility": { "type": "string", "enum": ["private", "public"] },
         "privacy": { "type": "string", "enum": ["private", "personal", "public"] },
+        "curators": { "type": "array", "items": { "type": "string" } },
         "allowedUsers": { "type": "array", "items": { "type": "string" } },
         "folioDate": { "type": "string", "format": "date" },
         "createdAt": { "type": "string", "format": "date-time" },
@@ -112,6 +114,22 @@
         "creatorUsername": { "type": "string" }
       },
       "required": ["id", "creatorId", "title"]
+    },
+    "Share": {
+      "title": "Share",
+      "description": "An access key for a Folio",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "folioId": { "type": "string" },
+        "type": { "type": "string", "enum": ["guest", "curator"] },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "revoked"] },
+        "accessedBy": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "folioId", "type", "status"]
     },
     "Postcard": {
       "title": "Postcard",
@@ -129,7 +147,9 @@
         "lat": { "type": "number" },
         "lng": { "type": "number" },
         "postcardDate": { "type": "string", "format": "date" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "folioVisibility": { "type": "string", "enum": ["private", "public"] },
+        "folioPrivacy": { "type": "string", "enum": ["private", "personal", "public"] }
       },
       "required": ["id", "folioId", "creatorId", "mediaUrls", "secureToken"]
     }
@@ -166,6 +186,10 @@
     "/postcards/{postcardId}": {
       "schema": "Postcard",
       "description": "Individual postcards"
+    },
+    "/shares/{shareId}": {
+      "schema": "Share",
+      "description": "Access keys and sharing permissions"
     }
   }
 }
