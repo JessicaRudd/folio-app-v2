@@ -1,32 +1,22 @@
+version: '3.8'
+
 services:
   web:
-    build: .
+    image: us-central1-docker.pkg.dev/folio-app-492702/folio-repo/web:latest
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - IMGPROXY_URL=http://localhost:8080
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GITHUB_FEEDBACK_TOKEN=${GITHUB_FEEDBACK_TOKEN}
-      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
-      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
-    depends_on:
-      - image-proc
-    # Cloud Run specific extensions
+      - FIREBASE_API_KEY=${FIREBASE_API_KEY}
+      - MUSIC_KIT_TOKEN=${MUSIC_KIT_TOKEN}
+    # GCP Cloud Run Extensions
     x-google-cloud-run:
-      service-account: folio-service-account@${PROJECT_ID}.iam.gserviceaccount.com
-      cpu: 1
-      memory: 512Mi
       min-instances: 0
-      max-instances: 10
+      execution-environment: gen2
 
   image-proc:
-    image: darthsim/imgproxy:latest
+    image: imgproxy/imgproxy:latest
     ports:
       - "8080:8080"
     environment:
-      - IMGPROXY_BIND=0.0.0.0:8080
-      - IMGPROXY_LOCAL_FILESYSTEM_ROOT=/app/public
-    x-google-cloud-run:
-      cpu: 0.5
-      memory: 512Mi
+      - IMGPROXY_LISTEN=:8080
+      - IMGPROXY_MAX_SRC_RESOLUTION=50
