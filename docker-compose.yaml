@@ -14,7 +14,7 @@ services:
       execution-environment: gen2
 
   image-proc:
-    image: imgproxy/imgproxy:latest
+    image: us-central1-docker.pkg.dev/folio-app-492702/folio-repo/imgproxy:latest
     ports:
       - "8080:8080"
     environment:

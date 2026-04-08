@@ -38,6 +38,12 @@ jobs:
             --build-arg VITE_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }} \
             -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest .
           docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest
+          
+          # Pull from Docker Hub with full name and push to our own registry
+          # This avoids mirror.gcr.io issues in Cloud Run
+          docker pull docker.io/imgproxy/imgproxy:latest
+          docker tag docker.io/imgproxy/imgproxy:latest us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
+          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
 
       - name: Deploy to Cloud Run
         run: |
@@ -50,5 +56,5 @@ jobs:
               --port 3000 \
               --set-secrets FIREBASE_API_KEY=FIREBASE_API_KEY:latest,MUSIC_KIT_TOKEN=MUSIC_KIT_TOKEN:latest \
             --container image-proc \
-              --image docker.io/imgproxy/imgproxy:latest \
+              --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest \
               --set-env-vars IMGPROXY_LISTEN=:8080,IMGPROXY_MAX_SRC_RESOLUTION=50
