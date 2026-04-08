@@ -39,10 +39,10 @@ jobs:
             -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest .
           docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest
           
-          # Pull from Docker Hub with full name and push to our own registry
-          # This avoids mirror.gcr.io issues in Cloud Run
-          docker pull docker.io/imgproxy/imgproxy:latest
-          docker tag docker.io/imgproxy/imgproxy:latest us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
+          # Pull from GitHub Container Registry (GHCR) instead of Docker Hub
+          # GHCR is more reliable within GitHub Actions and avoids Docker Hub rate limits
+          docker pull ghcr.io/imgproxy/imgproxy:latest
+          docker tag ghcr.io/imgproxy/imgproxy:latest us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
           docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
 
       - name: Deploy to Cloud Run
