@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 
 # Accept build arguments for environment variables
@@ -29,7 +29,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Production Server
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

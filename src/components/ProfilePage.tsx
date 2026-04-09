@@ -152,11 +152,11 @@ export const ProfilePage = () => {
 
       // Only update editable fields to avoid overwriting counts
       const editableData = {
-        displayName: profile.displayName,
-        bio: profile.bio,
-        username: profile.username,
-        profilePrivacy: profile.profilePrivacy,
-        photoURL,
+        displayName: profile.displayName || '',
+        bio: profile.bio || '',
+        username: profile.username || '',
+        profilePrivacy: profile.profilePrivacy || 'private',
+        photoURL: photoURL || '',
         updatedAt: new Date().toISOString()
       };
 

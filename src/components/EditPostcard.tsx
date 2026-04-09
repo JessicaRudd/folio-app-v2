@@ -137,11 +137,11 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
       const postcardRef = doc(db, 'postcards', postcard.id);
       
       const updates: any = {
-        caption,
-        location,
-        mediaUrls,
-        postcardDate,
-        musicVibe,
+        caption: caption || '',
+        location: location || '',
+        mediaUrls: mediaUrls || [],
+        postcardDate: postcardDate || new Date().toISOString().split('T')[0],
+        musicVibe: musicVibe || null,
         updatedAt: new Date().toISOString()
       };
 

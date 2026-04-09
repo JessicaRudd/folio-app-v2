@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, getDocFromServer, doc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Import the local config file provided by AI Studio
@@ -29,10 +29,33 @@ const firebaseConfig = {
   measurementId: getEnv('VITE_FIREBASE_MEASUREMENT_ID') || firebaseAppletConfig.measurementId
 };
 
+console.log("Firebase Config at Runtime:", {
+  projectId: firebaseConfig.projectId,
+  databaseId: firebaseAppletConfig.firestoreDatabaseId,
+  authDomain: firebaseConfig.authDomain
+});
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseAppletConfig.firestoreDatabaseId);
+const databaseId = firebaseAppletConfig.firestoreDatabaseId === '(default)' ? undefined : firebaseAppletConfig.firestoreDatabaseId;
+export const db = getFirestore(app, databaseId);
+console.log("Firestore Instance Initialized with DB ID:", databaseId || "(default)");
 export const storage = getStorage(app);
+
+async function testConnection() {
+  try {
+    console.log("Testing Firestore connection to:", databaseId || "(default)");
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    console.log("Firestore connection test successful (or document not found, but RPC worked)");
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.error("CRITICAL: Firestore client is offline. Check project configuration and network.");
+    } else {
+      console.error("Firestore connection test error:", error);
+    }
+  }
+}
+testConnection();
 
 export enum OperationType {
   CREATE = 'create',

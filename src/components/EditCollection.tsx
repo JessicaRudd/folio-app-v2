@@ -318,20 +318,22 @@ export const EditCollection = ({ collection: collectionData, onClose, onSuccess 
       const currentFolioToken = folioMetadata?.shareToken || '';
       const newVisibility = privacy === 'public' ? 'public' : 'private';
       
-      await updateDoc(collectionRef, {
-        title,
-        description,
-        location,
-        collectionDate,
-        coverImage: finalCoverUrl,
-        privacy,
+      const updateData: any = {
+        title: title || '',
+        description: description || '',
+        location: location || '',
+        collectionDate: collectionDate || new Date().toISOString().split('T')[0],
+        coverImage: finalCoverUrl || '',
+        privacy: privacy || 'private',
         visibility: newVisibility,
-        musicVibe,
+        musicVibe: musicVibe || null,
         profilePrivacy: userProfile?.profilePrivacy || 'private',
         allowedUsers: privacy === 'personal' ? allowedUsers : [],
-        folioToken: currentFolioToken,
+        folioToken: currentFolioToken || '',
         updatedAt: serverTimestamp()
-      });
+      };
+
+      await updateDoc(collectionRef, updateData);
 
       // Update denormalized fields in postcards
       if (privacy !== collectionData.privacy || newVisibility !== collectionData.visibility || currentFolioToken !== collectionData.folioToken) {

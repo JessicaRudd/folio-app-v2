@@ -363,18 +363,18 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           collectionId: finalCollectionId,
           creatorId: auth.currentUser.uid,
           mediaUrls: downloadUrls,
-          caption,
-          location,
+          caption: caption || '',
+          location: location || '',
           lat: coordinates?.lat || null,
           lng: coordinates?.lng || null,
-          musicVibe,
+          musicVibe: musicVibe || null,
           secureToken,
           createdAt: serverTimestamp(),
           postcardDate: postcardDate,
           visibilityList: [], 
           collectionVisibility,
           collectionPrivacy,
-          folioToken,
+          folioToken: folioToken || '',
           profilePrivacy: userStats?.profilePrivacy || 'private'
         });
 

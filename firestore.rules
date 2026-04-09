@@ -1,334 +1,147 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
     // ===============================================================
     // Helper Functions
     // ===============================================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
+    
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+    
     function isAdmin() {
       return isAuthenticated() && 
-        ( (request.auth.token.email == "jess@irudd.com" && request.auth.token.email_verified == true) ||
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin')
-        );
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') || 
+         (request.auth.token.email == "jess@irudd.com" && request.auth.token.email_verified == true));
     }
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-    function isValidUser(data) {
-      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'photoUrl', 'role', 'isPremium', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'total_folio_count', 'total_collection_count', 'total_postcard_count', 'monthly_postcard_count', 'follower_count', 'following_count', 'createdAt', 'updatedAt', 'lastLogin', 'providerId', 'emailVerified', 'phoneNumber', 'disabled', 'metadata', 'customClaims'];
-      return data.keys().hasOnly(allowedFields) &&
-             (!('uid' in data) || (data.uid is string && data.uid.size() < 100)) &&
-             (!('email' in data) || (data.email is string && isValidEmail(data.email))) &&
-             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
-             (!('photoURL' in data) || (data.photoURL is string)) &&
-             (!('photoUrl' in data) || (data.photoUrl is string)) &&
-             (!('bio' in data) || (data.bio is string && data.bio.size() < 1000)) &&
-             (!('username' in data) || (data.username is string && data.username.size() < 50)) &&
-             (!('profilePrivacy' in data) || data.profilePrivacy in ['private', 'public']) &&
-             (!('role' in data) || data.role in ['admin', 'creator', 'user']) &&
-             (!('isPremium' in data) || data.isPremium is bool) &&
-             (!('follower_count' in data) || data.follower_count is number) &&
-             (!('following_count' in data) || data.following_count is number) &&
-             (!('total_folio_count' in data) || data.total_folio_count is number) &&
-             (!('total_collection_count' in data) || data.total_collection_count is number) &&
-             (!('total_postcard_count' in data) || data.total_postcard_count is number) &&
-             (!('createdAt' in data) || data.createdAt is string || data.createdAt is timestamp);
-    }
-
-    function isValidPublicProfile(data) {
-      let allowedFields = ['uid', 'displayName', 'photoURL', 'photoUrl', 'bio', 'username', 'profilePrivacy', 'follower_count', 'following_count', 'createdAt', 'updatedAt'];
-      return data.keys().hasOnly(allowedFields) &&
-             (!('uid' in data) || (data.uid is string)) &&
-             (!('displayName' in data) || (data.displayName is string)) &&
-             (!('photoURL' in data) || (data.photoURL is string)) &&
-             (!('photoUrl' in data) || (data.photoUrl is string)) &&
-             (!('bio' in data) || (data.bio is string)) &&
-             (!('username' in data) || (data.username is string)) &&
-             (!('profilePrivacy' in data) || (data.profilePrivacy is string));
-    }
-
-    function isValidMusicVibe(data) {
-      return data is map && 
-             data.keys().hasOnly(['service', 'type', 'id', 'url', 'title', 'artist', 'artworkUrl']) &&
-             data.get('service', '') in ['spotify', 'apple-music'] &&
-             data.get('type', '') in ['track', 'playlist', 'album'] &&
-             data.get('id', '') is string &&
-             data.get('url', '') is string;
-    }
-
-    function isValidCollection(data) {
-      return (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
-             (!('creatorId' in data) || (data.creatorId is string && data.creatorId.size() < 100)) &&
-             (!('title' in data) || (data.title is string && data.title.size() > 0 && data.title.size() < 100)) &&
-             (!('description' in data) || (data.description is string && data.description.size() < 2000)) &&
-             (!('location' in data) || (data.location is string && data.location.size() < 500)) &&
-             (!('privacy' in data) || data.privacy in ['private', 'personal', 'public']) &&
-             (!('visibility' in data) || data.visibility in ['private', 'public']) &&
-             (!('profilePrivacy' in data) || data.profilePrivacy in ['private', 'public']) &&
-             (!('collectionDate' in data) || (data.collectionDate is string && data.collectionDate.size() < 100)) &&
-             (!('curators' in data) || (data.curators is map && data.curators.size() < 50)) &&
-             (!('curatorIds' in data) || (data.curatorIds is list && data.curatorIds.size() < 50)) &&
-             (!('allowedUsers' in data) || (data.allowedUsers is list && data.allowedUsers.size() < 100)) &&
-             (!('postcardCount' in data) || data.postcardCount is number) &&
-             (!('photoCount' in data) || data.photoCount is number) &&
-             (!('creatorName' in data) || (data.creatorName is string && data.creatorName.size() < 200)) &&
-             (!('creatorUsername' in data) || (data.creatorUsername is string && data.creatorUsername.size() < 200)) &&
-             (!('folioToken' in data) || (data.folioToken is string && data.folioToken.size() < 200)) &&
-             (!('musicVibe' in data) || data.musicVibe == null || isValidMusicVibe(data.musicVibe)) &&
-             (!('createdAt' in data) || data.createdAt is timestamp) &&
-             (!('updatedAt' in data) || data.updatedAt is timestamp);
-    }
-
-    function isValidShare(data) {
-      let requiredFields = ['type', 'status'];
-      let allowedFields = ['id', 'collectionId', 'userId', 'username', 'type', 'email', 'phone', 'status', 'accessedBy', 'createdAt', 'updatedAt', 'token', 'expiresAt'];
-      return data.keys().hasAll(requiredFields) &&
-             data.keys().hasOnly(allowedFields) &&
-             (!('collectionId' in data) || data.collectionId is string) &&
-             (!('userId' in data) || data.userId is string) &&
-             (!('token' in data) || (data.token is string && data.token.size() > 10)) &&
-             (!('expiresAt' in data) || data.expiresAt == null || data.expiresAt is timestamp) &&
-             data.type in ['guest', 'curator', 'folio'] &&
-             data.status in ['active', 'revoked'];
-    }
-
-    function isValidPostcard(data) {
-      return (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
-             (!('collectionId' in data) || (data.collectionId is string && data.collectionId.size() < 100)) &&
-             (!('creatorId' in data) || (data.creatorId is string && data.creatorId.size() < 100)) &&
-             (!('mediaUrls' in data) || (data.mediaUrls is list && data.mediaUrls.size() > 0 && data.mediaUrls.size() <= 5)) &&
-             (!('secureToken' in data) || (data.secureToken is string && data.secureToken.size() < 200)) &&
-             (!('caption' in data) || (data.caption is string && data.caption.size() < 5000)) &&
-             (!('location' in data) || (data.location is string && data.location.size() < 500)) &&
-             (!('postcardDate' in data) || (data.postcardDate is string && data.postcardDate.size() < 100)) &&
-             (!('visibilityList' in data) || (data.visibilityList is list && data.visibilityList.size() < 100)) &&
-             (!('lat' in data) || data.lat == null || data.lat is number) &&
-             (!('lng' in data) || data.lng == null || data.lng is number) &&
-             (!('collectionVisibility' in data) || data.collectionVisibility in ['private', 'public']) &&
-             (!('collectionPrivacy' in data) || data.collectionPrivacy in ['private', 'personal', 'public']) &&
-             (!('folioToken' in data) || (data.folioToken is string && data.folioToken.size() < 200)) &&
-             (!('musicVibe' in data) || data.musicVibe == null || isValidMusicVibe(data.musicVibe)) &&
-             (!('createdAt' in data) || data.createdAt is timestamp) &&
-             (!('updatedAt' in data) || data.updatedAt is timestamp);
-    }
-
-    function isValidLike(data) {
-      let allowedFields = ['postcardId', 'userId', 'createdAt'];
-      return data.keys().hasOnly(allowedFields) &&
-             data.postcardId is string &&
-             data.userId is string;
+    
+    function isCurator(data) {
+      return isAuthenticated() && 
+        (data.creatorId == request.auth.uid || 
+         (request.auth.uid in data.get('curatorIds', [])));
     }
 
     function isCuratorOfCollection(collectionId) {
-      let collPath = /databases/$(database)/documents/collections/$(collectionId);
+      let collectionData = get(/databases/$(database)/documents/collections/$(collectionId)).data;
       return isAuthenticated() && 
-             collectionId != 'loose-leaves' &&
-             exists(collPath) &&
-             (get(collPath).data.get('creatorId', '') == request.auth.uid || 
-              request.auth.uid in get(collPath).data.get('curators', {}));
+        (collectionData.creatorId == request.auth.uid || 
+         (request.auth.uid in collectionData.get('curatorIds', [])));
     }
 
-    function curatorRole(collectionId) {
-      let collectionPath = /databases/$(database)/documents/collections/$(collectionId);
-      return (collectionId != 'loose-leaves' && exists(collectionPath)) ? 
-        ((get(collectionPath).data.get('creatorId', '') == request.auth.uid) ? 'owner' : get(collectionPath).data.get('curators', {}).get(request.auth.uid, 'none')) : 
-        'none';
+    function isInvited(data) {
+      return isAuthenticated() && 
+        (request.auth.token.email in data.get('allowedUsers', []));
     }
 
     function isInvitedToCollection(collectionId) {
+      let collectionData = get(/databases/$(database)/documents/collections/$(collectionId)).data;
       return isAuthenticated() && 
-             collectionId != 'loose-leaves' &&
-             exists(/databases/$(database)/documents/collections/$(collectionId)) &&
-             get(/databases/$(database)/documents/collections/$(collectionId)).data.get('privacy', 'private') == 'personal' && 
-             request.auth.token.email in get(/databases/$(database)/documents/collections/$(collectionId)).data.get('allowedUsers', []);
-    }
-
-    function isOneCountChange(field) {
-      let oldVal = (field in resource.data) ? resource.data[field] : 0;
-      let newVal = (field in request.resource.data) ? request.resource.data[field] : 0;
-      return math.abs(newVal - oldVal) == 1;
-    }
-
-    function areImmutableFieldsUnchanged(fields) {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+        (request.auth.token.email in collectionData.get('allowedUsers', []));
     }
 
     // ===============================================================
-    // Rules
+    // Collection Rules
     // ===============================================================
+
+    // Test Collection (for connection test)
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // Users Collection
     match /users/{userId} {
-      // Protect PII: Only owner can read their own email. 
-      // Public profiles can be read by anyone.
-      allow read: if isOwner(userId) || isAdmin() || resource.data.profilePrivacy == 'public';
-      
-      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data) && (request.resource.data.role in ['creator', 'user'] || isAdmin());
-      allow update: if isAuthenticated() && (
-        isOwner(userId) || 
-        isAdmin() || 
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['follower_count']) && isOneCountChange('follower_count'))
-      ) && isValidUser(request.resource.data) && (
-        isOwner(userId) || 
-        isAdmin() || 
-        areImmutableFieldsUnchanged(['role', 'uid', 'email', 'createdAt'])
-      );
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
+    // Public Profiles
     match /public_profiles/{username} {
       allow read: if true;
-      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.uid || isAdmin());
-      allow update: if isAuthenticated() && (
-        (request.auth.uid == resource.data.uid) || 
-        isAdmin() ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['follower_count']) && isOneCountChange('follower_count')) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['following_count']) && isOneCountChange('following_count'))
-      ) && isValidPublicProfile(request.resource.data);
-      allow delete: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create, update: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
     }
 
-    match /follows/{followId} {
-      allow read: if true;
-      allow create: if isAuthenticated() && (request.auth.uid == request.resource.data.followerId || isAdmin());
-      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.followerId || isAdmin());
+    // Collections
+    match /collections/{collectionId} {
+      allow read: if isAdmin() ||
+                     resource.data.privacy == 'public' || 
+                     resource.data.visibility == 'public' ||
+                     isCurator(resource.data) ||
+                     isInvited(resource.data) ||
+                     (resource.data.folioToken != null); // Allow guest access via token
+      
+      allow create: if isAuthenticated();
+      allow update: if isCurator(resource.data) || isAdmin();
+      allow delete: if isCurator(resource.data) || isAdmin();
     }
 
+    // Postcards
+    match /postcards/{postcardId} {
+      allow read: if isAdmin() ||
+                     resource.data.collectionVisibility == 'public' ||
+                     resource.data.creatorId == request.auth.uid ||
+                     isCuratorOfCollection(resource.data.collectionId) ||
+                     resource.data.folioToken != null || // Allow guest access via folio token
+                     resource.data.secureToken != null || // Allow guest access via postcard token
+                     isInvitedToCollection(resource.data.collectionId);
+      
+      allow create: if isAuthenticated();
+      allow update: if resource.data.creatorId == request.auth.uid || isCuratorOfCollection(resource.data.collectionId) || isAdmin();
+      allow delete: if resource.data.creatorId == request.auth.uid || isCuratorOfCollection(resource.data.collectionId) || isAdmin();
+    }
+
+    // Shares
+    match /shares/{shareId} {
+      allow read: if true; // Publicly readable for verification
+      allow create: if isAuthenticated();
+      allow update, delete: if resource.data.userId == request.auth.uid || isAdmin();
+    }
+
+    // Likes
     match /likes/{likeId} {
       allow read: if true;
-      allow create: if isValidLike(request.resource.data) && 
-                      (isAuthenticated() ? request.auth.uid == request.resource.data.userId : request.resource.data.userId.matches("^guest_.*"));
-      allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid) || 
-                      (resource.data.userId.matches("^guest_.*"));
+      allow create: if isAuthenticated();
+      allow delete: if resource.data.userId == request.auth.uid;
     }
 
+    // Comments
     match /comments/{commentId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
-    }
-
-    match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow update, delete: if resource.data.userId == request.auth.uid || isAdmin();
     }
 
-    match /collections/{collectionId} {
-      function isCurator() {
-        return isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
-               request.auth.uid in resource.data.get('curators', {}) ||
-               request.auth.uid in resource.data.get('curatorIds', []));
-      }
-      function role() {
-        return (resource.data.get('creatorId', '') == request.auth.uid) ? 'owner' : resource.data.get('curators', {}).get(request.auth.uid, 'none');
-      }
-
-      allow read: if (resource.data.get('visibility', 'private') == 'public' && resource.data.get('profilePrivacy', 'public') == 'public') || 
-                   (resource.data.get('privacy', 'private') == 'public' && resource.data.get('profilePrivacy', 'public') == 'public') || 
-                   isCurator() ||
-                   isAdmin() ||
-                   (isAuthenticated() && resource.data.get('privacy', 'private') == 'personal' && request.auth.token.email in resource.data.get('allowedUsers', [])) ||
-                   (resource.data.get('folioToken', '') != '' && resource.data.get('privacy', 'private') != 'personal') ||
-                   (resource.data.get('secureToken', '') != '');
-      
-      allow create: if isAuthenticated() && isValidCollection(request.resource.data) && (request.resource.data.creatorId == request.auth.uid || isAdmin()) &&
-                    (isAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('total_collection_count', 0) < 10);
-      allow update: if isAuthenticated() && (role() == 'owner' || isAdmin() || role() == 'editor');
-      allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || isAdmin());
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
+    // Folio Metadata
     match /folio_metadata/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read: if true;
+      allow write: if isOwner(userId) || isAdmin();
     }
 
+    // Folio Tokens
     match /folio_tokens/{token} {
-      allow get: if true;
-      allow create, delete: if isAuthenticated() && (isOwner(request.resource.data.userId) || isOwner(resource.data.userId) || isAdmin());
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
-    match /postcards/{postcardId} {
-      function collectionIsPublic() {
-        return resource.data.get('collectionVisibility', 'private') == 'public' || resource.data.get('collectionPrivacy', 'private') == 'public';
-      }
-      function userIsCurator() {
-        return isCuratorOfCollection(resource.data.collectionId);
-      }
-      function userIsInvited() {
-        return isInvitedToCollection(resource.data.collectionId);
-      }
-    function role() {
-      let collId = (request.method == 'create') ? request.resource.data.collectionId : resource.data.collectionId;
-      return curatorRole(collId);
-    }
-
-    // Allow read if the user is the creator, curator, invited, or in the visibility list
-    allow get: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
-                  request.auth.uid in resource.data.get('visibilityList', []))) ||
-                  collectionIsPublic() || userIsCurator() || userIsInvited() || isAdmin();
-    
-    // Allow list (query) if the user has access or provides a valid token
-    allow list: if (isAuthenticated() && (resource.data.creatorId == request.auth.uid || 
-                  request.auth.uid in resource.data.get('visibilityList', []))) ||
-                   (collectionIsPublic() && resource.data.get('profilePrivacy', 'public') == 'public') ||
-                   userIsCurator() ||
-                   userIsInvited() ||
-                   isAdmin() ||
-                   (resource.data.get('folioToken', '') != '' && request.query.filters.folioToken == resource.data.folioToken);
-
-    allow create: if isAuthenticated() && (isAdmin() || (isValidPostcard(request.resource.data) && 
-                  (request.resource.data.creatorId == request.auth.uid) &&
-                  (request.resource.data.collectionId == 'loose-leaves' || role() == 'owner' || role() == 'editor') &&
-                  get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('total_postcard_count', 0) < 100));
-      allow update: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || role() == 'owner' || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.creatorId == request.auth.uid || role() == 'owner' || isAdmin());
-    }
-
-    match /shares/{shareId} {
-      function canManageShare(collectionId) {
-        let collPath = /databases/$(database)/documents/collections/$(collectionId);
-        return exists(collPath) && (
-          get(collPath).data.get('creatorId', '') == request.auth.uid ||
-          request.auth.uid in get(collPath).data.get('curators', {})
-        );
-      }
-
-      allow get: if isAuthenticated() || 
-        (resource.data.get('status', '') == 'active' && 
-         (resource.data.get('expiresAt', null) == null || resource.data.expiresAt > request.time));
-      
-      allow list: if isAuthenticated() && (
-        (resource.data.get('userId', '') == request.auth.uid) ||
-        (resource.data.get('type', '') != 'folio' && canManageShare(resource.data.get('collectionId', ''))) ||
-        isAdmin()
-      );
-      allow create: if isAuthenticated() && isValidShare(request.resource.data) && (
-        (request.resource.data.get('type', '') == 'folio' && request.resource.data.get('userId', '') == request.auth.uid) ||
-        (request.resource.data.get('type', '') != 'folio' && canManageShare(request.resource.data.get('collectionId', ''))) ||
-        isAdmin()
-      );
-      allow update: if (isAuthenticated() && (
-        (resource.data.get('userId', '') == request.auth.uid) ||
-        (resource.data.get('type', '') != 'folio' && canManageShare(resource.data.get('collectionId', ''))) ||
-        isAdmin()
-      )) || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accessedBy']));
-      allow delete: if isAuthenticated() && (
-        (resource.data.get('userId', '') == request.auth.uid) ||
-        (resource.data.get('type', '') != 'folio' && canManageShare(resource.data.get('collectionId', ''))) ||
-        isAdmin()
-      );
-    }
-
+    // Waitlist
     match /waitlist/{email} {
-      allow create: if true; // Anyone can join waitlist
+      allow create: if true;
       allow read, update, delete: if isAdmin();
     }
   }

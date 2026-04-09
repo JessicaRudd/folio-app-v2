@@ -98,6 +98,8 @@ function CreatorDashboard() {
               if (!newMessage) setDismissedAlert(null);
             }
           }
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
         });
       } else {
         setUserProfile(null);
@@ -131,6 +133,8 @@ function CreatorDashboard() {
         photos += doc.data().mediaUrls?.length || 0;
       });
       setLooseStats({ postcards: snapshot.size, photos });
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'postcards_loose_leaves');
     });
   }, [user]);
 
@@ -188,11 +192,15 @@ function CreatorDashboard() {
     const unsub1 = onSnapshot(q1, (snap) => {
       collections1 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       updateCollections();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'collections_created');
     });
 
     const unsub2 = onSnapshot(q2, (snap) => {
       collections2 = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       updateCollections();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'collections_curated');
     });
 
     return () => {
@@ -247,20 +255,8 @@ function CreatorDashboard() {
   };
 
   const handleShareCollection = (collection: any) => {
-    const baseUrl = window.location.origin;
-    let shareUrl = '';
-    
-    // If it's a public collection or has a public link enabled, use the premium public view
-    if ((collection.privacy === 'public' || collection.visibility === 'public') && userProfile?.profilePrivacy === 'public') {
-      shareUrl = `${baseUrl}/s/${collection.id}`;
-    } 
-    // Otherwise, use the private guest view link
-    else {
-      shareUrl = `${baseUrl}/v/${collection.id}`;
-    }
-
-    navigator.clipboard.writeText(shareUrl);
-    alert('Link copied to clipboard!');
+    setSelectedCollectionId(collection.id);
+    setIsSharingCollection(true);
   };
 
   const selectedCollection = realCollections.find(f => f.id === selectedCollectionId);

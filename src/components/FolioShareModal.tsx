@@ -5,6 +5,7 @@ import { Button } from './ui/Button';
 import { cn } from '../lib/utils';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
+  Timestamp,
   doc, 
   collection, 
   query, 
@@ -80,20 +81,28 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
       
       // 1. Update/Create Folio Metadata
       const metaRef = doc(db, 'folio_metadata', user.uid);
-      await setDoc(metaRef, {
-        userId: user.uid,
-        shareToken: token,
-        updatedAt: serverTimestamp()
-      });
+      try {
+        await setDoc(metaRef, {
+          userId: user.uid,
+          shareToken: token,
+          updatedAt: serverTimestamp()
+        });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.WRITE, `folio_metadata/${user.uid}`);
+      }
 
       // 1b. Create Folio Token for secure lookup
       const tokenRef = doc(db, 'folio_tokens', token);
-      await setDoc(tokenRef, {
-        userId: user.uid,
-        displayName: user.displayName || '',
-        username: user.username || '',
-        createdAt: serverTimestamp()
-      });
+      try {
+        await setDoc(tokenRef, {
+          userId: user.uid,
+          displayName: user.displayName || '',
+          username: user.username || '',
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.CREATE, `folio_tokens/${token}`);
+      }
 
       // 2. Propagate token to all user's collections
       const collectionsQuery = query(collection(db, 'collections'), where('creatorId', '==', user.uid));
@@ -113,12 +122,16 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
         batch.update(p.ref, { folioToken: token });
       });
 
-      await batch.commit();
+      try {
+        await batch.commit();
+      } catch (e) {
+        handleFirestoreError(e, OperationType.WRITE, 'batch_update_folio_token');
+      }
       
       setFolioMetadata({ userId: user.uid, shareToken: token });
     } catch (err) {
       console.error('Error generating folio token:', err);
-      handleFirestoreError(err, OperationType.WRITE, 'folio_metadata');
+      // Error already handled
     } finally {
       setLoading(false);
     }
@@ -128,7 +141,12 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
     if (!inviteEmail.trim()) return;
     setLoading(true);
     try {
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      let token = folioMetadata?.shareToken;
+      if (!token) {
+        token = await generateFolioToken();
+      }
+      
+      const shareToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       
       let expiresAt: Date | null = null;
       if (expiration !== 'never') {
@@ -138,21 +156,32 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
         if (expiration === '30d') expiresAt.setDate(expiresAt.getDate() + 30);
       }
 
-      await addDoc(collection(db, 'shares'), {
-        userId: user.uid,
-        username: user.username,
-        type: 'folio',
-        email: inviteEmail.trim().toLowerCase(),
-        token,
-        expiresAt: expiresAt ? expiresAt.toISOString() : null,
-        status: 'active',
-        createdAt: serverTimestamp(),
-        accessedBy: []
-      });
+      if (!user?.uid) {
+        throw new Error('User ID is missing. Please try logging in again.');
+      }
+
+      const shareId = Math.random().toString(36).substring(2, 15);
+      try {
+        await setDoc(doc(db, 'shares', shareId), {
+          id: shareId,
+          userId: user.uid,
+          username: user.username || '',
+          folioToken: token || '',
+          type: 'folio',
+          email: inviteEmail.trim().toLowerCase(),
+          token: shareToken,
+          expiresAt: expiresAt ? Timestamp.fromDate(expiresAt) : null,
+          status: 'active',
+          createdAt: serverTimestamp(),
+          accessedBy: []
+        });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.CREATE, `shares/${shareId}`);
+      }
       setInviteEmail('');
     } catch (err) {
       console.error('Error creating folio share:', err);
-      handleFirestoreError(err, OperationType.CREATE, 'shares');
+      // Error already handled
     } finally {
       setLoading(false);
     }
@@ -264,7 +293,9 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
                       <div className="min-w-0">
                         <div className="text-xs font-bold truncate">{share.email}</div>
                         <div className="text-[9px] text-charcoal/40 uppercase tracking-widest font-bold">
-                          {share.expiresAt ? `Expires: ${new Date(share.expiresAt).toLocaleDateString()}` : 'Never expires'}
+                          {share.expiresAt ? `Expires: ${
+                            (share.expiresAt.toDate ? share.expiresAt.toDate() : new Date(share.expiresAt)).toLocaleDateString()
+                          }` : 'Never expires'}
                         </div>
                       </div>
                     </div>

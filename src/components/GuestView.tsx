@@ -39,7 +39,7 @@ export const GuestView = () => {
 
         // 1. If it's a folioToken link (Public Folio Link)
         if (folioToken) {
-          await fetchData();
+          await fetchData(undefined, undefined, false);
           setIsVerified(true);
           return;
         }
@@ -49,31 +49,54 @@ export const GuestView = () => {
           const shareDoc = await getDoc(doc(db, 'shares', secureToken));
           
           if (shareDoc.exists() && shareDoc.data().status === 'active') {
-            const shareData = shareDoc.data();
+            const sData = shareDoc.data();
             
             // Validate token
-            if (shareData.token !== token) {
+            if (sData.token !== token) {
               setError(true);
               setLoading(false);
               return;
             }
 
             // Check expiration
-            if (shareData.expiresAt && new Date(shareData.expiresAt) < new Date()) {
+            const expiryDate = sData.expiresAt?.toDate ? sData.expiresAt.toDate() : (sData.expiresAt ? new Date(sData.expiresAt) : null);
+            if (expiryDate && expiryDate < new Date()) {
               setError(true);
               setLoading(false);
               return;
             }
 
-            setShareData({ id: shareDoc.id, ...shareData });
+            setShareData({ id: shareDoc.id, ...sData });
             
-            // Fetch Collection
-            const cDoc = await getDoc(doc(db, 'collections', collectionId));
-            if (cDoc.exists()) {
-              setCollectionData(cDoc.data());
-              const userDoc = await getDoc(doc(db, 'users', cDoc.data().creatorId));
-              if (userDoc.exists()) setCreator(userDoc.data());
+            // Use denormalized data as initial state
+            if (sData.collectionTitle) {
+              setCollectionData({
+                id: sData.collectionId,
+                title: sData.collectionTitle,
+                description: sData.collectionDescription,
+                coverImage: sData.collectionCoverImage,
+                folioToken: sData.folioToken
+              });
             }
+
+            // Fetch Collection
+            try {
+              const cDoc = await getDoc(doc(db, 'collections', collectionId));
+              if (cDoc.exists()) {
+                setCollectionData({ id: cDoc.id, ...cDoc.data() });
+                const userDoc = await getDoc(doc(db, 'users', cDoc.data().creatorId));
+                if (userDoc.exists()) setCreator(userDoc.data());
+              }
+            } catch (err) {
+              console.warn('Could not fetch full collection data, using denormalized info:', err);
+              // If we don't even have denormalized data, then we fail
+              if (!sData.collectionTitle) {
+                setError(true);
+                setLoading(false);
+                return;
+              }
+            }
+            await fetchData(sData.collectionId, sData.folioToken, true);
             setLoading(false);
             return;
           }
@@ -81,14 +104,14 @@ export const GuestView = () => {
 
         // 3. If it's a public link (from Explore or Public Profile)
         if (secureToken === 'public') {
-          await fetchData();
+          await fetchData(undefined, undefined, false);
           setIsVerified(true);
           return;
         }
 
         // 4. If it's an old-style secureToken link or direct ID
         if (secureToken && secureToken !== 'invite') {
-          await fetchData();
+          await fetchData(undefined, undefined, false);
           setIsVerified(true);
           return;
         }
@@ -100,7 +123,8 @@ export const GuestView = () => {
             const sData = shareDoc.data();
             
             // Check expiration for legacy shares if they have it
-            if (sData.expiresAt && new Date(sData.expiresAt) < new Date()) {
+            const expiryDate = sData.expiresAt?.toDate ? sData.expiresAt.toDate() : (sData.expiresAt ? new Date(sData.expiresAt) : null);
+            if (expiryDate && expiryDate < new Date()) {
               setError(true);
               setLoading(false);
               return;
@@ -123,7 +147,7 @@ export const GuestView = () => {
         }
 
         // 6. Fallback to direct collection lookup (for public collections or direct links)
-        await fetchData();
+        await fetchData(undefined, undefined, false);
         setIsVerified(true);
       } catch (err) {
         console.error('Error checking share:', err);
@@ -157,7 +181,7 @@ export const GuestView = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const fetchData = async (targetCollectionId?: string) => {
+  const fetchData = async (targetCollectionId?: string, targetFolioToken?: string, isInvite: boolean = false) => {
     const id = targetCollectionId || collectionId;
     if (!id) return;
 
@@ -185,40 +209,42 @@ export const GuestView = () => {
         }
 
         // Access Control Logic
-        const hasValidFolioToken = folioToken && cData.folioToken === folioToken;
-        const isProfilePublic = creatorData?.profilePrivacy === 'public';
+        if (!isInvite) {
+          const hasValidFolioToken = folioToken && cData.folioToken === folioToken;
+          const isProfilePublic = creatorData?.profilePrivacy === 'public';
 
-        // 1. If accessed via Public Folio Link (folioToken provided)
-        if (hasValidFolioToken) {
-          // Public Folio Link is ONLY valid if profile is public AND collection is public
-          if (!isProfilePublic || cData.privacy !== 'public') {
-            setError(true);
-            setLoading(false);
-            return;
+          // 1. If accessed via Public Folio Link (folioToken provided)
+          if (hasValidFolioToken) {
+            // Public Folio Link is ONLY valid if profile is public AND collection is public
+            if (!isProfilePublic || cData.privacy !== 'public') {
+              setError(true);
+              setLoading(false);
+              return;
+            }
+          } 
+          // 2. If accessed via Public Link (secureToken === 'public' or direct ID)
+          else if (secureToken === 'public' || (!secureToken && !folioToken)) {
+            // A collection is viewable publicly if:
+            // - It's privacy is 'public' AND the profile is public
+            // - OR it's privacy is 'private' but 'Public Link' (visibility) is enabled AND profile is public
+            const canAccessPublicly = (cData.privacy === 'public' && isProfilePublic) || 
+                                     (cData.privacy === 'private' && cData.visibility === 'public' && isProfilePublic);
+            
+            if (!canAccessPublicly) {
+              setError(true);
+              setLoading(false);
+              return;
+            }
           }
-        } 
-        // 2. If accessed via Public Link (secureToken === 'public' or direct ID)
-        else if (secureToken === 'public' || (!secureToken && !folioToken)) {
-          // A collection is viewable publicly if:
-          // - It's privacy is 'public' AND the profile is public
-          // - OR it's privacy is 'private' but 'Public Link' (visibility) is enabled AND profile is public
-          const canAccessPublicly = (cData.privacy === 'public' && isProfilePublic) || 
-                                   (cData.privacy === 'private' && cData.visibility === 'public' && isProfilePublic);
-          
-          if (!canAccessPublicly) {
-            setError(true);
-            setLoading(false);
-            return;
+          // 3. If accessed via old secureToken (not 'public' or 'invite')
+          else if (secureToken && secureToken !== 'invite') {
+             // Old secure tokens were for private sharing, they bypass profile privacy but still need valid token
+             if (cData.secureToken !== secureToken) {
+               setError(true);
+               setLoading(false);
+               return;
+             }
           }
-        }
-        // 3. If accessed via old secureToken (not 'public' or 'invite')
-        else if (secureToken && secureToken !== 'invite') {
-           // Old secure tokens were for private sharing, they bypass profile privacy but still need valid token
-           if (cData.secureToken !== secureToken) {
-             setError(true);
-             setLoading(false);
-             return;
-           }
         }
 
         setCollectionData(cData);
@@ -232,20 +258,22 @@ export const GuestView = () => {
           };
         }
         
-        setCreator(creatorData);
+      setCreator(creatorData);
 
-        const q = (cData.folioToken || folioToken)
-          ? query(
-              collection(db, 'postcards'),
-              where('collectionId', '==', id),
-              where('folioToken', '==', cData.folioToken || folioToken)
-            )
-          : query(
-              collection(db, 'postcards'),
-              where('collectionId', '==', id),
-              where('collectionVisibility', '==', 'public'),
-              where('profilePrivacy', '==', 'public')
-            );
+      const activeFolioToken = targetFolioToken || cData.folioToken || folioToken;
+
+      const q = activeFolioToken
+        ? query(
+            collection(db, 'postcards'),
+            where('collectionId', '==', id),
+            where('folioToken', '==', activeFolioToken)
+          )
+        : query(
+            collection(db, 'postcards'),
+            where('collectionId', '==', id),
+            where('collectionVisibility', '==', 'public'),
+            where('profilePrivacy', '==', 'public')
+          );
         
         const querySnapshot = await getDocs(q);
         const docs = querySnapshot.docs.map(doc => ({ 
@@ -294,7 +322,7 @@ export const GuestView = () => {
     setTimeout(async () => {
       if (otp === '123456' || email === shareData?.email) {
         setIsVerified(true);
-        await fetchData(shareData.collectionId);
+        await fetchData(shareData.collectionId, undefined, true);
         // Track access
         await updateDoc(doc(db, 'shares', shareData.id), {
           accessedBy: arrayUnion(email)

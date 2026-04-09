@@ -137,7 +137,8 @@ export const CollectionView = () => {
             }
 
             // Check expiration
-            if (sData.expiresAt && new Date(sData.expiresAt) < new Date()) {
+            const expiryDate = sData.expiresAt?.toDate ? sData.expiresAt.toDate() : (sData.expiresAt ? new Date(sData.expiresAt) : null);
+            if (expiryDate && expiryDate < new Date()) {
               setError('Collection invite has expired');
               setLoading(false);
               return;
@@ -171,7 +172,13 @@ export const CollectionView = () => {
       
       const isPrivateInvite = !!shareId;
 
-      if (isPrivateInvite) {
+      if (folioToken) {
+        collectionsQuery = query(
+          collectionsRef, 
+          where('creatorId', '==', userId),
+          where('folioToken', '==', folioToken)
+        );
+      } else if (isPrivateInvite) {
         // Private invite: Can see Public + Private (not Personal)
         collectionsQuery = query(
           collectionsRef, 

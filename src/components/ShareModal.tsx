@@ -17,6 +17,7 @@ import {
 import { Button } from './ui/Button';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
+  Timestamp,
   doc, 
   updateDoc, 
   collection, 
@@ -30,7 +31,9 @@ import {
   getDoc,
   setDoc,
   writeBatch,
-  deleteField
+  deleteField,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore';
 import { cn } from '../lib/utils';
 
@@ -131,9 +134,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
         }
 
         const targetUid = userSnap.docs[0].id;
-        await updateDoc(doc(db, 'collections', collectionData.id), {
-          [`curators.${targetUid}`]: inviteRole
-        });
+        try {
+          await updateDoc(doc(db, 'collections', collectionData.id), {
+            [`curators.${targetUid}`]: inviteRole,
+            curatorIds: arrayUnion(targetUid)
+          });
+        } catch (e) {
+          handleFirestoreError(e, OperationType.UPDATE, `collections/${collectionData.id}`);
+        }
       } else {
         // Ensure collection has a folioToken for guest access
         let currentFolioToken = collectionData.folioToken;
@@ -149,7 +157,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
           postcardsSnap.docs.forEach(p => {
             batch.update(p.ref, { folioToken: currentFolioToken });
           });
-          await batch.commit();
+          
+          try {
+            await batch.commit();
+          } catch (e) {
+            handleFirestoreError(e, OperationType.WRITE, 'batch_update_folio_token');
+          }
         }
 
         // Create Guest Share with Token and Expiration
@@ -163,20 +176,36 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
           if (expiration === '30d') expiresAt.setDate(expiresAt.getDate() + 30);
         }
 
-        await addDoc(collection(db, 'shares'), {
-          collectionId: collectionData.id,
-          type: 'guest',
-          email: inviteEmail.trim().toLowerCase(),
-          token,
-          expiresAt: expiresAt ? expiresAt.toISOString() : null,
-          status: 'active',
-          createdAt: serverTimestamp(),
-          accessedBy: []
-        });
+        if (!collectionData?.id) {
+          throw new Error('Collection ID is missing.');
+        }
+
+        const shareId = Math.random().toString(36).substring(2, 15);
+        try {
+          await setDoc(doc(db, 'shares', shareId), {
+            id: shareId,
+            userId: auth.currentUser!.uid,
+            collectionId: collectionData.id,
+            collectionTitle: collectionData.title,
+            collectionDescription: collectionData.description || '',
+            collectionCoverImage: collectionData.coverImage || '',
+            folioToken: currentFolioToken || '',
+            type: 'guest',
+            email: inviteEmail.trim().toLowerCase(),
+            token,
+            expiresAt: expiresAt ? Timestamp.fromDate(expiresAt) : null,
+            status: 'active',
+            createdAt: serverTimestamp(),
+            accessedBy: []
+          });
+        } catch (e) {
+          handleFirestoreError(e, OperationType.CREATE, `shares/${shareId}`);
+        }
       }
       setInviteEmail('');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating share:', err);
+      // Error already handled by handleFirestoreError if it was a Firestore error
     } finally {
       setLoading(false);
     }
@@ -192,12 +221,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
 
   const removeCurator = async (uid: string) => {
     try {
-      const { deleteField } = await import('firebase/firestore');
       await updateDoc(doc(db, 'collections', collectionData.id), {
-        [`curators.${uid}`]: deleteField()
+        [`curators.${uid}`]: deleteField(),
+        curatorIds: arrayRemove(uid)
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error removing curator:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `collections/${collectionData.id}`);
     }
   };
 
@@ -378,7 +408,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
                           <div>
                             <div className="text-sm font-bold">{share.email}</div>
                             <div className="text-[9px] text-charcoal/40 uppercase tracking-widest font-bold">
-                              {share.expiresAt ? `Expires: ${new Date(share.expiresAt).toLocaleDateString()}` : 'Never expires'}
+                              {share.expiresAt ? `Expires: ${
+                                (share.expiresAt.toDate ? share.expiresAt.toDate() : new Date(share.expiresAt)).toLocaleDateString()
+                              }` : 'Never expires'}
                             </div>
                           </div>
                         </div>
