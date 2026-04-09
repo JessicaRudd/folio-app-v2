@@ -426,7 +426,7 @@ function CreatorDashboard() {
                       caption={postcard.caption}
                       location={postcard.location}
                       date={postcard.date}
-                      musicTrack={postcard.musicTrack}
+                      musicVibe={postcard.musicVibe}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
                       collectionPrivacy={postcard.collectionPrivacy}
                       collectionVisibility={postcard.collectionVisibility}

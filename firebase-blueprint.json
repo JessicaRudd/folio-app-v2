@@ -113,7 +113,19 @@
         "photoCount": { "type": "number" },
         "creatorName": { "type": "string" },
         "creatorUsername": { "type": "string" },
-        "folioToken": { "type": "string" }
+        "folioToken": { "type": "string" },
+        "musicVibe": {
+          "type": "object",
+          "properties": {
+            "service": { "type": "string", "enum": ["spotify", "apple-music"] },
+            "type": { "type": "string", "enum": ["track", "playlist", "album"] },
+            "id": { "type": "string" },
+            "url": { "type": "string", "format": "uri" },
+            "title": { "type": "string" },
+            "artist": { "type": "string" },
+            "artworkUrl": { "type": "string", "format": "uri" }
+          }
+        }
       },
       "required": ["id", "creatorId", "title"]
     },
@@ -175,7 +187,19 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "collectionVisibility": { "type": "string", "enum": ["private", "public"] },
         "collectionPrivacy": { "type": "string", "enum": ["private", "personal", "public"] },
-        "folioToken": { "type": "string" }
+        "folioToken": { "type": "string" },
+        "musicVibe": {
+          "type": "object",
+          "properties": {
+            "service": { "type": "string", "enum": ["spotify", "apple-music"] },
+            "type": { "type": "string", "enum": ["track", "playlist", "album"] },
+            "id": { "type": "string" },
+            "url": { "type": "string", "format": "uri" },
+            "title": { "type": "string" },
+            "artist": { "type": "string" },
+            "artworkUrl": { "type": "string", "format": "uri" }
+          }
+        }
       },
       "required": ["id", "collectionId", "creatorId", "mediaUrls", "secureToken"]
     },

@@ -8,6 +8,18 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { cn } from '../lib/utils';
 import EXIF from 'exif-js';
 
+import { MusicVibeSelector } from './MusicVibeSelector';
+
+interface MusicVibe {
+  service: 'spotify' | 'apple-music';
+  type: 'track' | 'playlist' | 'album';
+  id: string;
+  url: string;
+  title?: string;
+  artist?: string;
+  artworkUrl?: string;
+}
+
 interface CreatePostcardProps {
   onClose: () => void;
   onSuccess: () => void;
@@ -29,8 +41,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [postcardDate, setPostcardDate] = useState(new Date().toISOString().split('T')[0]);
-  const [musicSearch, setMusicSearch] = useState('');
-  const [selectedTrack, setSelectedTrack] = useState<{ title: string; artist: string } | null>(null);
+  const [musicVibe, setMusicVibe] = useState<MusicVibe | null>(null);
   
   // Collection State
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -356,7 +367,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           location,
           lat: coordinates?.lat || null,
           lng: coordinates?.lng || null,
-          musicTrack: selectedTrack,
+          musicVibe,
           secureToken,
           createdAt: serverTimestamp(),
           postcardDate: postcardDate,
@@ -379,6 +390,13 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
             postcardCount: increment(1),
             photoCount: increment(downloadUrls.length)
           };
+          
+          // Also update collection music vibe if it doesn't have one
+          const collectionSnap = await getDoc(doc(db, 'collections', finalCollectionId));
+          if (collectionSnap.exists() && !collectionSnap.data().musicVibe && musicVibe) {
+            updates.musicVibe = musicVibe;
+          }
+          
           await updateDoc(collectionRef, updates);
         }
       } catch (err) {
@@ -635,37 +653,11 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40 flex items-center gap-2">
-                        Soundtrack
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={musicSearch}
-                          onChange={(e) => setMusicSearch(e.target.value)}
-                          placeholder="Type a song name..."
-                          className="w-full p-3 bg-white rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 focus:border-sage outline-none transition-all pr-10"
-                        />
-                        {selectedTrack && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-sage">
-                            <Music size={18} />
-                          </div>
-                        )}
-                      </div>
-                      {musicSearch && !selectedTrack && (
-                        <div className="p-2 bg-white rounded-lg border border-charcoal/5 shadow-sm mt-1">
-                          <button 
-                            onClick={() => {
-                              setSelectedTrack({ title: musicSearch, artist: 'Various Artists' });
-                              setMusicSearch('');
-                            }}
-                            className="w-full text-left p-2 hover:bg-canvas rounded transition-colors text-sm"
-                          >
-                            Add "{musicSearch}"
-                          </button>
-                        </div>
-                      )}
+                    <div className="space-y-2 md:col-span-2">
+                      <MusicVibeSelector 
+                        onSelect={setMusicVibe}
+                        initialVibe={musicVibe}
+                      />
                     </div>
 
                     <div className="space-y-2">

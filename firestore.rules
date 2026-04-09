@@ -57,6 +57,15 @@ service cloud.firestore {
              (!('profilePrivacy' in data) || (data.profilePrivacy is string));
     }
 
+    function isValidMusicVibe(data) {
+      return data is map && 
+             data.keys().hasOnly(['service', 'type', 'id', 'url', 'title', 'artist', 'artworkUrl']) &&
+             data.get('service', '') in ['spotify', 'apple-music'] &&
+             data.get('type', '') in ['track', 'playlist', 'album'] &&
+             data.get('id', '') is string &&
+             data.get('url', '') is string;
+    }
+
     function isValidCollection(data) {
       return (!('id' in data) || (data.id is string && data.id.size() < 100)) &&
              (!('creatorId' in data) || (data.creatorId is string && data.creatorId.size() < 100)) &&
@@ -75,6 +84,7 @@ service cloud.firestore {
              (!('creatorName' in data) || (data.creatorName is string && data.creatorName.size() < 200)) &&
              (!('creatorUsername' in data) || (data.creatorUsername is string && data.creatorUsername.size() < 200)) &&
              (!('folioToken' in data) || (data.folioToken is string && data.folioToken.size() < 200)) &&
+             (!('musicVibe' in data) || data.musicVibe == null || isValidMusicVibe(data.musicVibe)) &&
              (!('createdAt' in data) || data.createdAt is timestamp) &&
              (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
@@ -107,6 +117,7 @@ service cloud.firestore {
              (!('collectionVisibility' in data) || data.collectionVisibility in ['private', 'public']) &&
              (!('collectionPrivacy' in data) || data.collectionPrivacy in ['private', 'personal', 'public']) &&
              (!('folioToken' in data) || (data.folioToken is string && data.folioToken.size() < 200)) &&
+             (!('musicVibe' in data) || data.musicVibe == null || isValidMusicVibe(data.musicVibe)) &&
              (!('createdAt' in data) || data.createdAt is timestamp) &&
              (!('updatedAt' in data) || data.updatedAt is timestamp);
     }

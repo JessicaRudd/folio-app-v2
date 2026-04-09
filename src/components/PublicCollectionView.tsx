@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Postcard } from './Postcard';
+import { MusicVibePlayer } from './MusicVibePlayer';
 import { motion } from 'motion/react';
 import { Globe, ArrowLeft, Share2, Check } from 'lucide-react';
 import { Button } from './ui/Button';
@@ -191,6 +192,13 @@ export const PublicCollectionView = () => {
             <p className="text-xl md:text-2xl text-charcoal/70 italic font-serif max-w-2xl mx-auto">
               {collectionData?.description}
             </p>
+
+            {collectionData?.musicVibe && (
+              <div className="max-w-md mx-auto pt-4">
+                <MusicVibePlayer vibe={collectionData.musicVibe} compact />
+              </div>
+            )}
+
             <div className="flex items-center justify-center gap-6 pt-8">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-lg bg-canvas">

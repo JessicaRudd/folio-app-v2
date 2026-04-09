@@ -11,6 +11,18 @@ import { TruncatedText } from './ui/TruncatedText';
 import { EditPostcard } from './EditPostcard';
 import { Edit2 } from 'lucide-react';
 
+import { MusicVibePlayer } from './MusicVibePlayer';
+
+interface MusicVibe {
+  service: 'spotify' | 'apple-music';
+  type: 'track' | 'playlist' | 'album';
+  id: string;
+  url: string;
+  title?: string;
+  artist?: string;
+  artworkUrl?: string;
+}
+
 interface PostcardProps {
   key?: string;
   id: string;
@@ -21,10 +33,7 @@ interface PostcardProps {
   location?: string;
   date: string;
   isPremium?: boolean;
-  musicTrack?: {
-    title: string;
-    artist: string;
-  };
+  musicVibe?: MusicVibe | null;
   collectionPrivacy?: string;
   collectionVisibility?: string;
   folioToken?: string;
@@ -39,7 +48,7 @@ export const Postcard = ({
   caption, 
   location, 
   date, 
-  musicTrack, 
+  musicVibe, 
   isPremium = false,
   collectionPrivacy,
   collectionVisibility,
@@ -325,6 +334,10 @@ export const Postcard = ({
           className="editorial-text border-l-2 border-sage/20 pl-6 py-2" 
         />
 
+        {musicVibe && (
+          <MusicVibePlayer vibe={musicVibe} />
+        )}
+
         <AnimatePresence>
           {showComments && (
             <Comments 
@@ -341,7 +354,7 @@ export const Postcard = ({
                 location,
                 mediaUrls: localMediaUrls,
                 postcardDate: date,
-                musicTrack,
+                musicVibe,
                 collectionId
               }}
               onClose={() => setShowEditModal(false)}
@@ -425,26 +438,7 @@ export const Postcard = ({
           </div>
         )}
 
-        {musicTrack && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass rounded-full px-6 py-3 flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-charcoal rounded-full flex items-center justify-center text-white">
-                <Music size={18} />
-              </div>
-              <div>
-                <div className="text-sm font-semibold">{musicTrack.title}</div>
-                <div className="text-xs text-charcoal/60">{musicTrack.artist}</div>
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" className="text-sage font-bold uppercase tracking-widest text-[10px]">
-              Play Preview
-            </Button>
-          </motion.div>
-        )}
+        {/* Removed old musicTrack display */}
       </div>
     </div>
   );

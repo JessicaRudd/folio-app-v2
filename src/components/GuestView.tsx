@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Postcard } from './Postcard';
+import { MusicVibePlayer } from './MusicVibePlayer';
 import { Navbar } from './Navbar';
 import { FeedbackModal } from './FeedbackModal';
 import { motion, AnimatePresence } from 'motion/react';
@@ -494,6 +495,13 @@ export const GuestView = () => {
                 {collectionData.description}
               </p>
             )}
+
+            {collectionData?.musicVibe && (
+              <div className="max-w-md mx-auto pt-4">
+                <MusicVibePlayer vibe={collectionData.musicVibe} compact />
+              </div>
+            )}
+
             <div className="w-24 h-px bg-sage/20 mx-auto" />
           </header>
   

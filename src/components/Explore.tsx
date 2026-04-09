@@ -392,7 +392,7 @@ export const Explore = () => {
                       caption={postcard.caption}
                       location={postcard.location}
                       date={postcard.date}
-                      musicTrack={postcard.musicTrack}
+                      musicVibe={postcard.musicVibe}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
                       collectionPrivacy={postcard.collectionPrivacy || 'public'}
                       collectionVisibility={postcard.collectionVisibility || 'public'}
@@ -424,7 +424,7 @@ export const Explore = () => {
                       caption={postcard.caption}
                       location={postcard.location}
                       date={postcard.date}
-                      musicTrack={postcard.musicTrack}
+                      musicVibe={postcard.musicVibe}
                       isPremium={userProfile?.isPremium || userProfile?.role === 'admin'}
                       collectionPrivacy={postcard.collectionPrivacy || 'public'}
                       collectionVisibility={postcard.collectionVisibility || 'public'}

@@ -7,6 +7,18 @@ import { doc, updateDoc, collection, query, where, getDocs, getDoc, deleteDoc, w
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { cn } from '../lib/utils';
 
+import { MusicVibeSelector } from './MusicVibeSelector';
+
+interface MusicVibe {
+  service: 'spotify' | 'apple-music';
+  type: 'track' | 'playlist' | 'album';
+  id: string;
+  url: string;
+  title?: string;
+  artist?: string;
+  artworkUrl?: string;
+}
+
 interface EditCollectionProps {
   collection: {
     id: string;
@@ -23,6 +35,7 @@ interface EditCollectionProps {
     creatorName?: string;
     creatorUsername?: string;
     folioToken?: string;
+    musicVibe?: MusicVibe | null;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -35,6 +48,7 @@ export const EditCollection = ({ collection: collectionData, onClose, onSuccess 
   const [description, setDescription] = useState(collectionData.description || '');
   const [location, setLocation] = useState(collectionData.location || '');
   const [collectionDate, setCollectionDate] = useState(collectionData.collectionDate || new Date().toISOString().split('T')[0]);
+  const [musicVibe, setMusicVibe] = useState<MusicVibe | null>(collectionData.musicVibe || null);
   const [privacy, setPrivacy] = useState<'private' | 'personal' | 'public'>(collectionData.privacy || 'private');
   const [visibility, setVisibility] = useState<'private' | 'public'>(collectionData.visibility || 'private');
   const [allowedUsers, setAllowedUsers] = useState<string[]>(collectionData.allowedUsers || []);
@@ -312,6 +326,7 @@ export const EditCollection = ({ collection: collectionData, onClose, onSuccess 
         coverImage: finalCoverUrl,
         privacy,
         visibility: newVisibility,
+        musicVibe,
         profilePrivacy: userProfile?.profilePrivacy || 'private',
         allowedUsers: privacy === 'personal' ? allowedUsers : [],
         folioToken: currentFolioToken,
@@ -465,6 +480,13 @@ export const EditCollection = ({ collection: collectionData, onClose, onSuccess 
                 className="w-full p-3 bg-white rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all"
               />
             </div>
+          </div>
+
+          <div className="space-y-4">
+            <MusicVibeSelector 
+              onSelect={setMusicVibe}
+              initialVibe={musicVibe}
+            />
           </div>
 
           <div className="space-y-2">
