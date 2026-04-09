@@ -20,24 +20,12 @@ service cloud.firestore {
     function isValidEmail(email) {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
-    }
-    function uidNotModified() {
-      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
-    }
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-    function validString(field, maxLen) {
-      return request.resource.data[field] is string && request.resource.data[field].size() <= maxLen;
-    }
 
     // ===============================================================
     // Domain Validators
     // ===============================================================
     function isValidUser(data) {
-      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'photoUrl', 'role', 'isPremium', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'total_folio_count', 'total_collection_count', 'total_postcard_count', 'monthly_postcard_count', 'follower_count', 'following_count', 'createdAt', 'updatedAt', 'lastLogin', 'providerId', 'emailVerified', 'phoneNumber', 'disabled', 'metadata', 'customClaims'];
+      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'photoUrl', 'role', 'isPremium', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'total_folio_count', 'total_collection_count', 'monthly_postcard_count', 'follower_count', 'following_count', 'createdAt', 'updatedAt', 'lastLogin', 'providerId', 'emailVerified', 'phoneNumber', 'disabled', 'metadata', 'customClaims'];
       return data.keys().hasOnly(allowedFields) &&
              (!('uid' in data) || (data.uid is string && data.uid.size() < 100)) &&
              (!('email' in data) || (data.email is string && isValidEmail(data.email))) &&
@@ -90,19 +78,6 @@ service cloud.firestore {
              (!('updatedAt' in data) || data.updatedAt is timestamp);
     }
 
-    function isValidFolioMetadata(data) {
-      let allowedFields = ['userId', 'shareToken', 'updatedAt'];
-      return data.keys().hasOnly(allowedFields) &&
-             data.userId is string &&
-             data.shareToken is string && data.shareToken.size() > 10;
-    }
-
-    function isValidFolioToken(data) {
-      let allowedFields = ['userId', 'displayName', 'username', 'createdAt'];
-      return data.keys().hasOnly(allowedFields) &&
-             data.userId is string;
-    }
-
     function isValidShare(data) {
       let requiredFields = ['type', 'status'];
       let allowedFields = ['id', 'collectionId', 'userId', 'username', 'type', 'email', 'phone', 'status', 'accessedBy', 'createdAt', 'updatedAt', 'token', 'expiresAt'];
@@ -111,7 +86,7 @@ service cloud.firestore {
              (!('collectionId' in data) || data.collectionId is string) &&
              (!('userId' in data) || data.userId is string) &&
              (!('token' in data) || (data.token is string && data.token.size() > 10)) &&
-             (!('expiresAt' in data) || data.expiresAt == null || data.expiresAt is string) &&
+             (!('expiresAt' in data) || data.expiresAt == null || data.expiresAt is timestamp) &&
              data.type in ['guest', 'curator', 'folio'] &&
              data.status in ['active', 'revoked'];
     }
@@ -156,11 +131,6 @@ service cloud.firestore {
       return (collectionId != 'loose-leaves' && exists(collectionPath)) ? 
         ((get(collectionPath).data.get('creatorId', '') == request.auth.uid) ? 'owner' : get(collectionPath).data.get('curators', {}).get(request.auth.uid, 'none')) : 
         'none';
-    }
-
-    function hasFolioAccess(creatorId, token) {
-      return exists(/databases/$(database)/documents/folio_metadata/$(creatorId)) &&
-             get(/databases/$(database)/documents/folio_metadata/$(creatorId)).data.shareToken == token;
     }
 
     function isInvitedToCollection(collectionId) {
@@ -321,7 +291,7 @@ service cloud.firestore {
 
       allow get: if isAuthenticated() || 
         (resource.data.get('status', '') == 'active' && 
-         (resource.data.get('expiresAt', null) == null || timestamp(resource.data.expiresAt) > request.time));
+         (resource.data.get('expiresAt', null) == null || resource.data.expiresAt > request.time));
       
       allow list: if isAuthenticated() && (
         (resource.data.get('userId', '') == request.auth.uid) ||
