@@ -46,6 +46,9 @@ export const FeedbackModal = ({ isOpen, onClose, user }: FeedbackModalProps) => 
       });
 
       if (!response.ok) throw new Error('Failed to submit feedback');
+      
+      const data = await response.json().catch(() => ({}));
+      if (!data.success) throw new Error('Invalid response from server');
 
       setIsSuccess(true);
       setTimeout(() => {
