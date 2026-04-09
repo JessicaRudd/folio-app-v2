@@ -25,7 +25,7 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
     function isValidUser(data) {
-      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'photoUrl', 'role', 'isPremium', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'total_folio_count', 'total_collection_count', 'monthly_postcard_count', 'follower_count', 'following_count', 'createdAt', 'updatedAt', 'lastLogin', 'providerId', 'emailVerified', 'phoneNumber', 'disabled', 'metadata', 'customClaims'];
+      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'photoUrl', 'role', 'isPremium', 'bio', 'username', 'profilePrivacy', 'total_storage_used', 'total_folio_count', 'total_collection_count', 'total_postcard_count', 'monthly_postcard_count', 'follower_count', 'following_count', 'createdAt', 'updatedAt', 'lastLogin', 'providerId', 'emailVerified', 'phoneNumber', 'disabled', 'metadata', 'customClaims'];
       return data.keys().hasOnly(allowedFields) &&
              (!('uid' in data) || (data.uid is string && data.uid.size() < 100)) &&
              (!('email' in data) || (data.email is string && isValidEmail(data.email))) &&
@@ -41,7 +41,8 @@ service cloud.firestore {
              (!('following_count' in data) || data.following_count is number) &&
              (!('total_folio_count' in data) || data.total_folio_count is number) &&
              (!('total_collection_count' in data) || data.total_collection_count is number) &&
-             (!('total_postcard_count' in data) || data.total_postcard_count is number);
+             (!('total_postcard_count' in data) || data.total_postcard_count is number) &&
+             (!('createdAt' in data) || data.createdAt is string || data.createdAt is timestamp);
     }
 
     function isValidPublicProfile(data) {
