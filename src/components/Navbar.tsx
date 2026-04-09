@@ -81,6 +81,7 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
   const secondaryLinks = [
     { name: 'Create Postcard', onClick: onCreate, icon: <Plus size={16} />, curatorOnly: true, tabletOnly: true },
     { name: 'Support Folio', path: SUPPORT_URL, icon: <Heart size={16} />, external: true },
+    { name: 'Feedback', onClick: onFeedback, icon: <MessageSquare size={16} /> },
     { name: 'What is Folio?', path: '/explore', icon: <Info size={16} />, guestOnly: true },
   ];
 
@@ -221,17 +222,17 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
                 <Link
                   key={link.name}
                   to={link.path}
-                  className="text-[10px] font-bold uppercase tracking-widest text-charcoal/30 hover:text-charcoal transition-colors"
+                  className="text-[10px] font-bold uppercase tracking-widest text-charcoal/30 hover:text-sage transition-colors flex items-center gap-2"
                 >
-                  {link.name}
+                  {link.icon} {link.name}
                 </Link>
               ) : (
                 <button
                   key={link.name}
                   onClick={link.onClick}
-                  className="text-[10px] font-bold uppercase tracking-widest text-charcoal/30 hover:text-charcoal transition-colors"
+                  className="text-[10px] font-bold uppercase tracking-widest text-charcoal/30 hover:text-sage transition-colors flex items-center gap-2"
                 >
-                  {link.name}
+                  {link.icon} {link.name}
                 </button>
               )
             ))}
