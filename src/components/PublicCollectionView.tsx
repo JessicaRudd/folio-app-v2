@@ -74,8 +74,7 @@ export const PublicCollectionView = () => {
           collection(db, 'postcards'),
           where('collectionId', '==', collectionId),
           where('collectionVisibility', '==', 'public'),
-          where('profilePrivacy', '==', 'public'),
-          orderBy('createdAt', 'desc')
+          where('profilePrivacy', '==', 'public')
         );
         
         const querySnapshot = await getDocs(q);
@@ -83,7 +82,11 @@ export const PublicCollectionView = () => {
           id: doc.id, 
           ...doc.data(),
           date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-        }));
+        })).sort((a: any, b: any) => {
+          const dateA = a.createdAt?.toDate?.()?.getTime() || new Date(a.createdAt).getTime() || 0;
+          const dateB = b.createdAt?.toDate?.()?.getTime() || new Date(b.createdAt).getTime() || 0;
+          return dateB - dateA;
+        });
         setPostcards(docs);
 
         // Update Meta Tags for SEO/Social Preview

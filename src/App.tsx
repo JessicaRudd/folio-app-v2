@@ -144,8 +144,7 @@ function CreatorDashboard() {
     // Query for collections created by user
     const q1 = query(
       collection(db, 'collections'),
-      where('creatorId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('creatorId', '==', user.uid)
     );
 
     // Query for collections where user is a curator
@@ -210,13 +209,11 @@ function CreatorDashboard() {
       ? query(
           collection(db, 'postcards'),
           where('collectionId', '==', selectedCollectionId),
-          where('creatorId', '==', user.uid),
-          orderBy('createdAt', 'desc')
+          where('creatorId', '==', user.uid)
         )
       : query(
           collection(db, 'postcards'),
-          where('collectionId', '==', selectedCollectionId),
-          orderBy('createdAt', 'desc')
+          where('collectionId', '==', selectedCollectionId)
         );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -224,7 +221,11 @@ function CreatorDashboard() {
         id: doc.id,
         ...doc.data(),
         date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-      }));
+      })).sort((a: any, b: any) => {
+        const dateA = a.createdAt?.toDate?.()?.getTime() || new Date(a.createdAt).getTime() || 0;
+        const dateB = b.createdAt?.toDate?.()?.getTime() || new Date(b.createdAt).getTime() || 0;
+        return dateB - dateA;
+      });
       setRealPostcards(docs);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'postcards');

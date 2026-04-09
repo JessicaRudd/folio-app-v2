@@ -168,11 +168,14 @@ export const socialService = {
   async getComments(postcardId: string) {
     const q = query(
       collection(db, 'comments'),
-      where('postcardId', '==', postcardId),
-      orderBy('createdAt', 'asc')
+      where('postcardId', '==', postcardId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => {
+      const dateA = a.createdAt?.toDate?.()?.getTime() || new Date(a.createdAt).getTime() || 0;
+      const dateB = b.createdAt?.toDate?.()?.getTime() || new Date(b.createdAt).getTime() || 0;
+      return dateA - dateB;
+    });
   },
 
   // Follows
@@ -318,11 +321,14 @@ export const socialService = {
     const q = query(
       collection(db, 'notifications'),
       where('userId', '==', auth.currentUser.uid),
-      orderBy('createdAt', 'desc'),
       limit(50)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => {
+      const dateA = a.createdAt?.toDate?.()?.getTime() || new Date(a.createdAt).getTime() || 0;
+      const dateB = b.createdAt?.toDate?.()?.getTime() || new Date(b.createdAt).getTime() || 0;
+      return dateB - dateA;
+    });
   },
 
   async markNotificationAsRead(notificationId: string) {
@@ -335,7 +341,6 @@ export const socialService = {
     const q = query(
       collection(db, 'notifications'),
       where('userId', '==', auth.currentUser.uid),
-      orderBy('createdAt', 'desc'),
       limit(50)
     );
     
@@ -344,6 +349,13 @@ export const socialService = {
         id: doc.id, 
         ...doc.data() 
       })) as Notification[];
+      
+      notifications.sort((a: any, b: any) => {
+        const dateA = a.createdAt?.toDate?.()?.getTime() || new Date(a.createdAt).getTime() || 0;
+        const dateB = b.createdAt?.toDate?.()?.getTime() || new Date(b.createdAt).getTime() || 0;
+        return dateB - dateA;
+      });
+      
       callback(notifications);
     });
   }

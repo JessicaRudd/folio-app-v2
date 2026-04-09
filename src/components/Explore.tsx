@@ -162,7 +162,6 @@ export const Explore = () => {
               const q = query(
                 collection(db, 'postcards'),
                 where('collectionId', 'in', chunk),
-                orderBy('createdAt', 'desc'),
                 limit(10)
               );
               try {
@@ -176,6 +175,13 @@ export const Explore = () => {
                 handleFirestoreError(err, OperationType.LIST, 'postcards_invited');
               }
             }
+            
+            // Sort client-side
+            invitedPostcards.sort((a: any, b: any) => {
+              const dateA = a.createdAt?.toDate?.()?.getTime() || new Date(a.createdAt).getTime() || 0;
+              const dateB = b.createdAt?.toDate?.()?.getTime() || new Date(b.createdAt).getTime() || 0;
+              return dateB - dateA;
+            });
           }
 
           // Combine and sort by date
