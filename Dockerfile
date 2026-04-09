@@ -34,14 +34,15 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install a simple server to serve static files
-RUN npm install -g serve
+# Copy package files and install production dependencies
+COPY package*.json ./
+RUN npm ci --omit=dev
 
-# Copy built assets from builder
+# Copy built assets and server from builder
 COPY --from=builder /app/dist ./dist
 
 # Cloud Run expects port 3000
 EXPOSE 3000
 
-# Start the server
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Start the Express server
+CMD ["npm", "start"]

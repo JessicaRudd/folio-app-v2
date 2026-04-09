@@ -67,7 +67,7 @@ jobs:
               --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }} \
               --port 3000 \
               --set-secrets FIREBASE_API_KEY=FIREBASE_API_KEY:latest,MUSIC_KIT_TOKEN=MUSIC_KIT_TOKEN:latest,GITHUB_FEEDBACK_TOKEN=GITHUB_FEEDBACK_TOKEN:latest \
-              --set-env-vars GITHUB_REPO_OWNER=${{ github.repository_owner }},GITHUB_REPO_NAME=${{ github.event.repository.name }} \
+              --set-env-vars GITHUB_REPO_OWNER=JessRudd,GITHUB_REPO_NAME=folio-app-v2 \
             --container image-proc \
               --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest \
               --set-env-vars IMGPROXY_LISTEN=:8080,IMGPROXY_MAX_SRC_RESOLUTION=50

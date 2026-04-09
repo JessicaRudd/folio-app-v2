@@ -34,7 +34,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   private async reportError(error: Error, errorInfo: ErrorInfo) {
     try {
-      await fetch('/api/support/report', {
+      const response = await fetch('/api/support/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -47,9 +47,14 @@ export class ErrorBoundary extends React.Component<Props, State> {
           identity: 'System Auto-Report'
         }),
       });
-      this.setState({ reported: true });
+      
+      if (response.ok) {
+        this.setState({ reported: true });
+      } else {
+        console.warn('Failed to auto-report error:', await response.text());
+      }
     } catch (e) {
-      console.error('Failed to auto-report error:', e);
+      console.error('Error reporting failed:', e);
     }
   }
 

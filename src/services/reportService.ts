@@ -8,13 +8,24 @@ export const handleReport = async (req: any, res: any) => {
     const repo = process.env.GITHUB_REPO_NAME;
 
     if (!token || !owner || !repo) {
-      console.error("Missing GitHub configuration");
+      console.error("Missing GitHub configuration:", { 
+        hasToken: !!token, 
+        hasOwner: !!owner, 
+        hasRepo: !!repo 
+      });
       if (typeof res.status === 'function') {
-        return res.status(500).json({ error: "Server configuration error" });
+        return res.status(500).json({ 
+          success: false,
+          error: "Server configuration error",
+          details: "Missing environment variables on server" 
+        });
       } else {
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
-        return res.end(JSON.stringify({ error: "Server configuration error" }));
+        return res.end(JSON.stringify({ 
+          success: false,
+          error: "Server configuration error" 
+        }));
       }
     }
 

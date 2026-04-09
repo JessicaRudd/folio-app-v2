@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, CheckCircle2, Loader2 } from 'lucide-react';
+import { X, Send, CheckCircle2, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/Button';
 
 interface FeedbackModalProps {
@@ -45,7 +45,10 @@ export const FeedbackModal = ({ isOpen, onClose, user }: FeedbackModalProps) => 
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to submit feedback');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || 'Failed to submit feedback');
+      }
       
       const data = await response.json().catch(() => ({}));
       if (!data.success) throw new Error('Invalid response from server');
@@ -56,8 +59,13 @@ export const FeedbackModal = ({ isOpen, onClose, user }: FeedbackModalProps) => 
         setMessage('');
         onClose();
       }, 3000);
-    } catch (err) {
-      setError('Service Unavailable');
+    } catch (err: any) {
+      console.error('Feedback submission error:', err);
+      if (err.message.includes('Missing environment variables')) {
+        setError('Configuration Missing');
+      } else {
+        setError('Service Unavailable');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -110,6 +118,34 @@ export const FeedbackModal = ({ isOpen, onClose, user }: FeedbackModalProps) => 
                     />
                   </div>
                 </div>
+              </motion.div>
+            ) : error === 'Configuration Missing' ? (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-12 text-center space-y-6"
+              >
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
+                    <ShieldAlert size={32} className="text-red-500" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-serif">Setup Required</h3>
+                  <p className="text-charcoal/60 italic editorial-text leading-relaxed">
+                    The feedback system is not yet configured in this environment.
+                  </p>
+                  <p className="text-charcoal/40 text-sm italic">
+                    Please ensure GITHUB_FEEDBACK_TOKEN, GITHUB_REPO_OWNER, and GITHUB_REPO_NAME are set in the environment.
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={onClose}
+                  className="w-full"
+                >
+                  Close
+                </Button>
               </motion.div>
             ) : error === 'Service Unavailable' ? (
               <motion.div 

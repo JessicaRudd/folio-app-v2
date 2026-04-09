@@ -16,6 +16,19 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Health Check Endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok",
+      environment: process.env.NODE_ENV || 'development',
+      config: {
+        hasToken: !!process.env.GITHUB_FEEDBACK_TOKEN,
+        hasOwner: !!process.env.GITHUB_REPO_OWNER,
+        hasRepo: !!process.env.GITHUB_REPO_NAME
+      }
+    });
+  });
+
   // GitHub Report Endpoint
   app.post("/api/support/report", handleReport);
 
