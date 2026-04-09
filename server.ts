@@ -16,6 +16,15 @@ async function startServer() {
 
   app.use(express.json());
 
+  console.log("Environment check:", {
+    NODE_ENV: process.env.NODE_ENV,
+    hasToken: !!process.env.GITHUB_FEEDBACK_TOKEN,
+    hasOwner: !!process.env.GITHUB_REPO_OWNER,
+    hasRepo: !!process.env.GITHUB_REPO_NAME,
+    owner: process.env.GITHUB_REPO_OWNER,
+    repo: process.env.GITHUB_REPO_NAME
+  });
+
   // Health Check Endpoint
   app.get("/api/health", (req, res) => {
     res.json({ 

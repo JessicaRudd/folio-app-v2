@@ -46,12 +46,27 @@ export const FeedbackModal = ({ isOpen, onClose, user }: FeedbackModalProps) => 
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.details || 'Failed to submit feedback');
+        const contentType = response.headers.get('content-type');
+        let errorDetails = 'Failed to submit feedback';
+        
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json().catch(() => ({}));
+          errorDetails = errorData.details || errorData.error || errorDetails;
+        } else {
+          const text = await response.text().catch(() => '');
+          console.error('Non-JSON error response:', text.slice(0, 200));
+          errorDetails = `Server error (${response.status})`;
+        }
+        throw new Error(errorDetails);
       }
       
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format from server');
+      }
+
       const data = await response.json().catch(() => ({}));
-      if (!data.success) throw new Error('Invalid response from server');
+      if (!data.success) throw new Error(data.error || 'Invalid response from server');
 
       setIsSuccess(true);
       setTimeout(() => {
@@ -64,7 +79,7 @@ export const FeedbackModal = ({ isOpen, onClose, user }: FeedbackModalProps) => 
       if (err.message.includes('Missing environment variables')) {
         setError('Configuration Missing');
       } else {
-        setError('Service Unavailable');
+        setError(err.message || 'Service Unavailable');
       }
     } finally {
       setIsSubmitting(false);
@@ -145,6 +160,34 @@ export const FeedbackModal = ({ isOpen, onClose, user }: FeedbackModalProps) => 
                   className="w-full"
                 >
                   Close
+                </Button>
+              </motion.div>
+            ) : error && error !== 'Service Unavailable' ? (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-12 text-center space-y-6"
+              >
+                <div className="flex justify-center">
+                  <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
+                    <ShieldAlert size={32} className="text-red-500" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-serif">Submission Error</h3>
+                  <p className="text-charcoal/60 italic editorial-text leading-relaxed">
+                    {error}
+                  </p>
+                  <p className="text-charcoal/40 text-sm italic">
+                    We encountered an issue while sending your feedback.
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setError(null)}
+                  className="w-full"
+                >
+                  Try Again
                 </Button>
               </motion.div>
             ) : error === 'Service Unavailable' ? (

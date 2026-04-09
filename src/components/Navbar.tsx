@@ -37,9 +37,22 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   const lastScrollY = useRef(0);
+
+  // Close menus on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Hide on scroll logic
   useMotionValueEvent(scrollY, "change", (latest) => {
@@ -56,19 +69,24 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
   useEffect(() => {
     setIsMobileMenuOpen(false);
     setIsMoreMenuOpen(false);
+    setIsProfileMenuOpen(false);
   }, [location.pathname]);
 
   const navLinks = [
-    { name: 'Folios', path: '/', icon: <User size={16} />, curatorOnly: true },
+    { name: 'Collections', path: '/', icon: <User size={16} />, curatorOnly: true },
     { name: 'Explore', path: '/explore', icon: <Globe size={16} /> },
     { name: 'Memory Map', path: '/map', icon: <MapPin size={16} />, curatorOnly: true },
   ];
 
   const secondaryLinks = [
     { name: 'Create Postcard', onClick: onCreate, icon: <Plus size={16} />, curatorOnly: true, tabletOnly: true },
-    { name: 'Settings', path: '/profile', icon: <Settings size={16} />, curatorOnly: true },
-    { name: 'Feedback', onClick: onFeedback, icon: <MessageSquare size={16} /> },
+    { name: 'Support Folio', path: SUPPORT_URL, icon: <Heart size={16} />, external: true },
     { name: 'What is Folio?', path: '/explore', icon: <Info size={16} />, guestOnly: true },
+  ];
+
+  const profileLinks = [
+    { name: 'Settings', path: '/profile', icon: <Settings size={16} /> },
+    { name: 'Feedback', onClick: onFeedback, icon: <MessageSquare size={16} /> },
   ];
 
   const filteredLinks = navLinks.filter(link => {
@@ -189,7 +207,17 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
           {/* Desktop Secondary Links */}
           <div className="hidden lg:flex items-center gap-6 mr-4 border-r border-charcoal/5 pr-6">
             {desktopSecondary.map((link) => (
-              link.path ? (
+              link.external ? (
+                <a
+                  key={link.name}
+                  href={link.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-bold uppercase tracking-widest text-charcoal/30 hover:text-sage transition-colors flex items-center gap-2"
+                >
+                  {link.icon} {link.name}
+                </a>
+              ) : link.path ? (
                 <Link
                   key={link.name}
                   to={link.path}
@@ -221,15 +249,76 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
                 <Plus size={16} />
                 Create Postcard
               </Button>
-              <Link to="/profile" className="p-1 rounded-full border-2 border-transparent hover:border-sage transition-all">
-                <div className="w-8 h-8 rounded-full bg-charcoal/5 flex items-center justify-center overflow-hidden">
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName} className="w-full h-full object-cover" />
-                  ) : (
-                    <UserCircle size={24} className="text-charcoal/20" />
+              
+              <div className="relative" ref={profileMenuRef}>
+                <button 
+                  onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                  className={cn(
+                    "p-1 rounded-full border-2 transition-all",
+                    isProfileMenuOpen ? "border-sage" : "border-transparent hover:border-sage/50"
                   )}
-                </div>
-              </Link>
+                >
+                  <div className="w-8 h-8 rounded-full bg-charcoal/5 flex items-center justify-center overflow-hidden">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt={user.displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <UserCircle size={24} className="text-charcoal/20" />
+                    )}
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {isProfileMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-charcoal/5 p-2 overflow-hidden"
+                    >
+                      <div className="px-4 py-3 border-b border-charcoal/5 mb-2">
+                        <p className="text-xs font-bold truncate">{user.displayName || 'Curator'}</p>
+                        <p className="text-[10px] text-charcoal/40 truncate">{user.email}</p>
+                      </div>
+
+                      {profileLinks.map((link) => (
+                        link.path ? (
+                          <Link
+                            key={link.name}
+                            to={link.path}
+                            onClick={() => setIsProfileMenuOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-charcoal/60 hover:text-sage hover:bg-sage/5 rounded-xl transition-all"
+                          >
+                            {link.icon} {link.name}
+                          </Link>
+                        ) : (
+                          <button
+                            key={link.name}
+                            onClick={() => {
+                              link.onClick?.();
+                              setIsProfileMenuOpen(false);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-charcoal/60 hover:text-sage hover:bg-sage/5 rounded-xl transition-all"
+                          >
+                            {link.icon} {link.name}
+                          </button>
+                        )
+                      ))}
+
+                      <div className="mt-2 pt-2 border-t border-charcoal/5">
+                        <button
+                          onClick={() => {
+                            onLogout();
+                            setIsProfileMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                          <LogOut size={16} /> Logout
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           ) : (
             <Button variant="primary" size="sm" onClick={() => onLogin('auth-email')} className="gap-2">

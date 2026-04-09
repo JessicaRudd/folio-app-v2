@@ -40,7 +40,7 @@ export const LimitReachedModal = ({ type, onClose }: LimitReachedModalProps) => 
 
   const limitInfo = {
     folios: {
-      title: 'Folio Limit Reached',
+      title: 'Collection Limit Reached',
       description: 'You have reached the maximum number of collections allowed in the beta version.',
       icon: <Zap className="text-sage" size={32} />,
     },

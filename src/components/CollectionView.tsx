@@ -116,7 +116,7 @@ export const CollectionView = () => {
 
         // Check profile privacy for public links (only if no token and no shareId)
         if (!shareId && !token && userData.profilePrivacy !== 'public') {
-          setError('This folio is private');
+          setError('This collection set is private');
           setLoading(false);
           return;
         }
@@ -138,7 +138,7 @@ export const CollectionView = () => {
 
             // Check expiration
             if (sData.expiresAt && new Date(sData.expiresAt) < new Date()) {
-              setError('Folio invite has expired');
+              setError('Collection invite has expired');
               setLoading(false);
               return;
             }
@@ -147,7 +147,7 @@ export const CollectionView = () => {
             setLoading(false);
             return;
           } else {
-            setError('Invalid or expired folio invite');
+            setError('Invalid or expired collection invite');
             setLoading(false);
             return;
           }
@@ -395,7 +395,7 @@ export const CollectionView = () => {
                     onClick={handleShareFolio}
                   >
                     {copied === 'folio' ? <Check size={16} className="text-sage" /> : <Share2 size={16} />}
-                    {copied === 'folio' ? 'Link Copied' : 'Share Folio'}
+                    {copied === 'folio' ? 'Link Copied' : 'Share Collections'}
                   </Button>
                 )}
               </div>
@@ -418,7 +418,7 @@ export const CollectionView = () => {
       <main className="max-w-7xl mx-auto py-16 px-6 space-y-12">
         <div className="text-center space-y-2">
           <h2 className="text-3xl font-serif">Shared Collections</h2>
-          <p className="text-charcoal/40 text-sm italic">You have access to view these collections via the shared folio link.</p>
+          <p className="text-charcoal/40 text-sm italic">You have access to view these collections via the shared link.</p>
           <div className="w-12 h-px bg-sage/20 mx-auto" />
         </div>
 

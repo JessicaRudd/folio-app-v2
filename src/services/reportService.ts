@@ -3,15 +3,17 @@ import { Octokit } from "octokit";
 export const handleReport = async (req: any, res: any) => {
   try {
     const { message, identity, url, userAgent, summary, type = 'feedback', stack } = req.body;
-    const token = process.env.GITHUB_FEEDBACK_TOKEN;
-    const owner = process.env.GITHUB_REPO_OWNER;
-    const repo = process.env.GITHUB_REPO_NAME;
+    const token = process.env.GITHUB_FEEDBACK_TOKEN?.trim();
+    const owner = process.env.GITHUB_REPO_OWNER?.trim();
+    const repo = process.env.GITHUB_REPO_NAME?.trim();
 
     if (!token || !owner || !repo) {
       console.error("Missing GitHub configuration:", { 
         hasToken: !!token, 
         hasOwner: !!owner, 
-        hasRepo: !!repo 
+        hasRepo: !!repo,
+        owner,
+        repo
       });
       if (typeof res.status === 'function') {
         return res.status(500).json({ 
@@ -64,12 +66,21 @@ ${stack ? `**Stack Trace:**\n\`\`\`\n${stack}\n\`\`\`` : ''}
     }
   } catch (error: any) {
     console.error("GitHub API Error:", error);
+    const errorMessage = error.message || "Failed to submit feedback";
     if (typeof res.status === 'function') {
-      res.status(500).json({ error: "Failed to submit feedback" });
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to submit feedback",
+        details: errorMessage
+      });
     } else {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ error: "Failed to submit feedback" }));
+      res.end(JSON.stringify({ 
+        success: false,
+        error: "Failed to submit feedback",
+        details: errorMessage
+      }));
     }
   }
 };
