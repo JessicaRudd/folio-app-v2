@@ -1,6 +1,6 @@
 {
   "name": "Folio",
-  "description": "A privacy-forward social app for sharing digital postcards with friends and family. Curated, editorial, and secure.",
+  "description": "A privacy-forward social app for sharing digital postcards with friends and family. Curate your folio at curateyourfolio.com.",
   "requestFramePermissions": [
     "camera",
     "microphone",

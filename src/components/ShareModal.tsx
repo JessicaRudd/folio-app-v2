@@ -198,6 +198,21 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
             createdAt: serverTimestamp(),
             accessedBy: []
           });
+
+          // Send invite email
+          const shareUrl = `${window.location.origin}/v/${collectionData.id}/${shareId}?token=${token}`;
+          fetch('/api/shares/invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              shareId,
+              email: inviteEmail.trim().toLowerCase(),
+              collectionTitle: collectionData.title,
+              creatorName: auth.currentUser?.displayName || 'A Folio user',
+              shareUrl
+            })
+          }).catch(err => console.error('Failed to send invite email:', err));
+
         } catch (e) {
           handleFirestoreError(e, OperationType.CREATE, `shares/${shareId}`);
         }

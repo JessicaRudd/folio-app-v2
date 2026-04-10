@@ -67,8 +67,8 @@ jobs:
             --container web \
               --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }} \
               --port 3000 \
-              --set-secrets FIREBASE_API_KEY=FIREBASE_API_KEY:latest,MUSIC_KIT_TOKEN=MUSIC_KIT_TOKEN:latest,GITHUB_FEEDBACK_TOKEN=GITHUB_FEEDBACK_TOKEN:latest \
-              --set-env-vars GITHUB_REPO_OWNER=JessicaRudd,GITHUB_REPO_NAME=folio-app-v2 \
+              --set-secrets FIREBASE_API_KEY=FIREBASE_API_KEY:latest,MUSIC_KIT_TOKEN=MUSIC_KIT_TOKEN:latest,GITHUB_FEEDBACK_TOKEN=GITHUB_FEEDBACK_TOKEN:latest,RESEND_API_KEY=RESEND_API_KEY:latest \
+              --set-env-vars GITHUB_REPO_OWNER=JessicaRudd,GITHUB_REPO_NAME=folio-app-v2,RESEND_FROM_EMAIL="Folio <hello@curateyourfolio.com>",RESEND_BRAND_URL=https://curateyourfolio.com \
             --container image-proc \
               --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest \
               --set-env-vars IMGPROXY_LISTEN=:8080,IMGPROXY_MAX_SRC_RESOLUTION=50

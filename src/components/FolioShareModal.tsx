@@ -161,11 +161,14 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
       }
 
       const shareId = Math.random().toString(36).substring(2, 15);
+      const shareUrl = `${window.location.origin}/f/${user.username}/invite/${shareId}?token=${shareToken}`;
+
       try {
         await setDoc(doc(db, 'shares', shareId), {
           id: shareId,
           userId: user.uid,
           username: user.username || '',
+          collectionTitle: 'Folio',
           folioToken: token || '',
           type: 'folio',
           email: inviteEmail.trim().toLowerCase(),
@@ -175,6 +178,20 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
           createdAt: serverTimestamp(),
           accessedBy: []
         });
+
+        // Send invite email
+        fetch('/api/shares/invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shareId,
+            email: inviteEmail.trim().toLowerCase(),
+            collectionTitle: 'Folio',
+            creatorName: user.displayName || 'A Folio user',
+            shareUrl
+          })
+        }).catch(err => console.error('Failed to send folio invite email:', err));
+
       } catch (e) {
         handleFirestoreError(e, OperationType.CREATE, `shares/${shareId}`);
       }

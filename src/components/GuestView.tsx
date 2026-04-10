@@ -305,33 +305,60 @@ export const GuestView = () => {
   };
 
   const handleSendOtp = async () => {
-    if (!email.trim()) return;
+    if (!email.trim() || !shareData) return;
     setAuthLoading(true);
-    // Simulate OTP send
-    setTimeout(() => {
-      setStep('otp');
+    try {
+      const response = await fetch('/api/shares/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shareId: shareData.id,
+          email: email.trim()
+        })
+      });
+      
+      if (response.ok) {
+        setStep('otp');
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to send access code');
+      }
+    } catch (err) {
+      console.error('Error sending OTP:', err);
+      alert('Failed to send access code. Please try again.');
+    } finally {
       setAuthLoading(false);
-    }, 1000);
+    }
   };
 
   const handleVerifyOtp = async () => {
-    if (otp.length !== 6) return;
+    if (otp.length !== 6 || !shareData) return;
     setAuthLoading(true);
     
-    // Simulate verification
-    setTimeout(async () => {
-      if (otp === '123456' || email === shareData?.email) {
+    try {
+      const response = await fetch('/api/shares/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shareId: shareData.id,
+          email: email.trim(),
+          otp
+        })
+      });
+
+      if (response.ok) {
         setIsVerified(true);
         await fetchData(shareData.collectionId, undefined, true);
-        // Track access
-        await updateDoc(doc(db, 'shares', shareData.id), {
-          accessedBy: arrayUnion(email)
-        });
       } else {
-        alert('Invalid code. Try 123456 for demo.');
+        const data = await response.json();
+        alert(data.error || 'Invalid code');
       }
+    } catch (err) {
+      console.error('Error verifying OTP:', err);
+      alert('Verification failed. Please try again.');
+    } finally {
       setAuthLoading(false);
-    }, 1000);
+    }
   };
 
   if (loading) {

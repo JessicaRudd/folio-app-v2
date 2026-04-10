@@ -24,6 +24,7 @@ import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Plus, Share2, Settings } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
+import { APP_LIMITS } from './constants';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot, orderBy, getDoc, doc } from 'firebase/firestore';
 
@@ -81,15 +82,17 @@ function CreatorDashboard() {
             const postcards = data.total_postcard_count || 0;
             const collections = data.total_collection_count || data.total_folio_count || 0;
             
+            const limits = data.role === 'admin' ? APP_LIMITS.ADMIN : (data.isPremium ? APP_LIMITS.PREMIUM : APP_LIMITS.FREE);
+            
             let newMessage: string | null = null;
-            if (postcards >= 100) {
-              newMessage = "You've reached the 100 postcard limit for beta users.";
-            } else if (collections >= 10) {
-              newMessage = "You've reached the 10 collection limit for beta users.";
-            } else if (postcards >= 90) {
-              newMessage = `You're approaching your limit (${postcards}/100 postcards used).`;
-            } else if (collections >= 9) {
-              newMessage = `You're approaching your limit (${collections}/10 collections used).`;
+            if (postcards >= limits.MAX_POSTCARDS && limits.MAX_POSTCARDS !== Infinity) {
+              newMessage = `You've reached the ${limits.MAX_POSTCARDS} postcard limit.`;
+            } else if (collections >= limits.MAX_FOLIOS && limits.MAX_FOLIOS !== Infinity) {
+              newMessage = `You've reached the ${limits.MAX_FOLIOS} collection limit.`;
+            } else if (limits.MAX_POSTCARDS !== Infinity && postcards >= limits.MAX_POSTCARDS * 0.9) {
+              newMessage = `You're approaching your limit (${postcards}/${limits.MAX_POSTCARDS} postcards used).`;
+            } else if (limits.MAX_FOLIOS !== Infinity && collections >= limits.MAX_FOLIOS * 0.9) {
+              newMessage = `You're approaching your limit (${collections}/${limits.MAX_FOLIOS} collections used).`;
             }
 
             // Only show if it's a new message or hasn't been dismissed

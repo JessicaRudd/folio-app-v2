@@ -12,7 +12,7 @@ export const Footer = ({ user, message, onFeedback }: FooterProps) => {
   return (
     <footer className="py-12 border-t border-charcoal/5 text-center space-y-4">
       <div className="text-charcoal/30 text-xs uppercase tracking-widest font-bold">
-        {message || <>&copy; 2026 Folio &mdash; Privacy First Sharing</>}
+        {message || <>&copy; 2026 Folio &mdash; curateyourfolio.com</>}
       </div>
       <button 
         onClick={onFeedback}

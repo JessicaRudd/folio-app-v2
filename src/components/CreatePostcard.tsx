@@ -7,6 +7,7 @@ import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, update
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { cn } from '../lib/utils';
 import EXIF from 'exif-js';
+import { APP_LIMITS } from '../constants';
 
 import { MusicVibeSelector } from './MusicVibeSelector';
 
@@ -176,14 +177,16 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
+      const limits = userStats?.role === 'admin' ? APP_LIMITS.ADMIN : (userStats?.isPremium ? APP_LIMITS.PREMIUM : APP_LIMITS.FREE);
       const totalFiles = mediaFiles.length + files.length;
-      if (totalFiles > 5) {
+      
+      if (totalFiles > limits.MAX_PHOTOS_PER_POSTCARD) {
         if (onLimitReached) {
           onLimitReached('photos');
         } else {
-          alert('Free accounts are limited to 5 photos per postcard.');
+          alert(`Your account is limited to ${limits.MAX_PHOTOS_PER_POSTCARD} photos per postcard.`);
         }
-        const allowedFiles = files.slice(0, 5 - mediaFiles.length);
+        const allowedFiles = files.slice(0, limits.MAX_PHOTOS_PER_POSTCARD - mediaFiles.length);
         if (allowedFiles.length === 0) return;
         
         setMediaFiles(prev => [...prev, ...allowedFiles]);
@@ -273,21 +276,19 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
     if (mediaFiles.length === 0 || !auth.currentUser) return;
 
     // Check Limits
-    const isAdmin = userStats?.role === 'admin';
-    const isPremium = userStats?.isPremium;
-    if (!isAdmin && !isPremium) {
-      const currentCollections = userStats?.total_collection_count || userStats?.total_folio_count || 0;
-      if (isCreatingNewCollection && currentCollections >= 10) {
-        if (onLimitReached) onLimitReached('folios');
-        else alert('Free accounts are limited to 10 collections.');
-        return;
-      }
-      const currentPostcards = userStats?.total_postcard_count || 0;
-      if (currentPostcards >= 100) {
-        if (onLimitReached) onLimitReached('postcards');
-        else alert('Free accounts are limited to 100 postcards.');
-        return;
-      }
+    const limits = userStats?.role === 'admin' ? APP_LIMITS.ADMIN : (userStats?.isPremium ? APP_LIMITS.PREMIUM : APP_LIMITS.FREE);
+    
+    const currentCollections = userStats?.total_collection_count || userStats?.total_folio_count || 0;
+    if (isCreatingNewCollection && currentCollections >= limits.MAX_FOLIOS && limits.MAX_FOLIOS !== Infinity) {
+      if (onLimitReached) onLimitReached('folios');
+      else alert(`Your account is limited to ${limits.MAX_FOLIOS} collections.`);
+      return;
+    }
+    const currentPostcards = userStats?.total_postcard_count || 0;
+    if (currentPostcards >= limits.MAX_POSTCARDS && limits.MAX_POSTCARDS !== Infinity) {
+      if (onLimitReached) onLimitReached('postcards');
+      else alert(`Your account is limited to ${limits.MAX_POSTCARDS} postcards.`);
+      return;
     }
 
     setLoading(true);
@@ -296,6 +297,13 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
 
       // 1. Create New Collection if needed
       if (isCreatingNewCollection && newCollectionTitle.trim()) {
+        // Check if the number of photos in this first postcard exceeds the collection limit
+        if (mediaFiles.length > limits.MAX_PHOTOS_PER_COLLECTION) {
+          alert(`This collection is limited to ${limits.MAX_PHOTOS_PER_COLLECTION} photos.`);
+          setLoading(false);
+          return;
+        }
+
         const collectionDoc = await addDoc(collection(db, 'collections'), {
           title: newCollectionTitle.trim(),
           creatorId: auth.currentUser!.uid,
@@ -320,7 +328,21 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
         });
       }
 
-      // 2. Upload All Media (with compression)
+      // 2. If adding to existing collection, check photo limit
+      if (!isCreatingNewCollection && finalCollectionId !== 'loose-leaves') {
+        const collectionSnap = await getDoc(doc(db, 'collections', finalCollectionId));
+        if (collectionSnap.exists()) {
+          const cData = collectionSnap.data();
+          const currentPhotoCount = cData.photoCount || 0;
+          if (currentPhotoCount + mediaFiles.length > limits.MAX_PHOTOS_PER_COLLECTION) {
+            alert(`This collection is limited to ${limits.MAX_PHOTOS_PER_COLLECTION} photos. It currently has ${currentPhotoCount}.`);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // 3. Upload All Media (with compression)
       console.log('Compressing and uploading media...');
       const uploadPromises = mediaFiles.map(async (file) => {
         let uploadData: Blob | File = file;
@@ -550,8 +572,9 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
                     <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Collection</label>
                     <button 
                       onClick={() => {
-                        if (!isCreatingNewCollection && !userStats?.isPremium && userStats?.role !== 'admin') {
-                          if ((userStats?.total_collection_count || 0) >= 10) {
+                        const limits = userStats?.role === 'admin' ? APP_LIMITS.ADMIN : (userStats?.isPremium ? APP_LIMITS.PREMIUM : APP_LIMITS.FREE);
+                        if (!isCreatingNewCollection && limits.MAX_FOLIOS !== Infinity) {
+                          if ((userStats?.total_collection_count || 0) >= limits.MAX_FOLIOS) {
                             if (onLimitReached) onLimitReached('folios');
                             return;
                           }
