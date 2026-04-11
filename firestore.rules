@@ -72,6 +72,9 @@ service cloud.firestore {
     // Collections
     match /collections/{collectionId} {
       allow read: if isAdmin() ||
+                     (resource.data.privacy == 'public' && 
+                      resource.data.visibility == 'public' && 
+                      resource.data.profilePrivacy == 'public') ||
                      resource.data.privacy == 'public' || 
                      resource.data.visibility == 'public' ||
                      isCurator(resource.data) ||
@@ -86,6 +89,8 @@ service cloud.firestore {
     // Postcards
     match /postcards/{postcardId} {
       allow read: if isAdmin() ||
+                     (resource.data.collectionVisibility == 'public' && 
+                      resource.data.profilePrivacy == 'public') ||
                      resource.data.collectionVisibility == 'public' ||
                      resource.data.creatorId == request.auth.uid ||
                      isCuratorOfCollection(resource.data.collectionId) ||
@@ -96,6 +101,13 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update: if resource.data.creatorId == request.auth.uid || isCuratorOfCollection(resource.data.collectionId) || isAdmin();
       allow delete: if resource.data.creatorId == request.auth.uid || isCuratorOfCollection(resource.data.collectionId) || isAdmin();
+    }
+
+    // Follows
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.followerId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.followerId == request.auth.uid;
     }
 
     // Shares

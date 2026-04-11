@@ -58,46 +58,55 @@ export const Explore = () => {
       setError(null);
       try {
         // 1. Fetch Public Collections
-        const collectionsRef = collection(db, 'collections');
-        const collectionsQuery = query(
-          collectionsRef,
-          where('privacy', '==', 'public'),
-          where('visibility', '==', 'public'),
-          where('profilePrivacy', '==', 'public'),
-          limit(20)
-        );
-        
-        const collectionsSnapshot = await getDocs(collectionsQuery);
-        const collections = collectionsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          collectionDate: doc.data().collectionDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-        }));
+        try {
+          const collectionsRef = collection(db, 'collections');
+          const collectionsQuery = query(
+            collectionsRef,
+            where('privacy', '==', 'public'),
+            where('visibility', '==', 'public'),
+            where('profilePrivacy', '==', 'public'),
+            limit(20)
+          );
+          
+          const collectionsSnapshot = await getDocs(collectionsQuery);
+          const collections = collectionsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            collectionDate: doc.data().collectionDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+            createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+          }));
 
-        setPublicCollections(collections);
+          setPublicCollections(collections);
+        } catch (err) {
+          console.error('Error fetching public collections:', err);
+          // Don't throw, just continue
+        }
 
         // 2. Fetch Public Curators
-        const curatorsRef = collection(db, 'public_profiles');
-        const curatorsQuery = query(
-          curatorsRef,
-          limit(10)
-        );
-        const curatorsSnapshot = await getDocs(curatorsQuery);
-        const curators = curatorsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setPublicCurators(curators);
+        try {
+          const curatorsRef = collection(db, 'public_profiles');
+          const curatorsQuery = query(
+            curatorsRef,
+            limit(10)
+          );
+          const curatorsSnapshot = await getDocs(curatorsQuery);
+          const curators = curatorsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setPublicCurators(curators);
+        } catch (err) {
+          console.error('Error fetching public curators:', err);
+        }
 
         // 3. Fetch Public Postcards (for everyone)
-        const publicPostcardsQuery = query(
-          collection(db, 'postcards'),
-          where('collectionVisibility', '==', 'public'),
-          where('profilePrivacy', '==', 'public'),
-          limit(20)
-        );
         try {
+          const publicPostcardsQuery = query(
+            collection(db, 'postcards'),
+            where('collectionVisibility', '==', 'public'),
+            where('profilePrivacy', '==', 'public'),
+            limit(20)
+          );
           const publicPostcardsSnap = await getDocs(publicPostcardsQuery);
           const publicPostcards = publicPostcardsSnap.docs.map(doc => ({
             id: doc.id,
@@ -106,89 +115,97 @@ export const Explore = () => {
           }));
           setPublicPostcards(publicPostcards);
         } catch (err) {
-          handleFirestoreError(err, OperationType.LIST, 'postcards_public');
+          console.error('Error fetching public postcards:', err);
         }
 
         // 4. Fetch Personalized Feed if logged in
         if (auth.currentUser) {
-          const followedIds = await socialService.getFollowedUserIds();
-          
-          // Fetch postcards from followed users
-          let followedPostcards: any[] = [];
-          if (followedIds.length > 0) {
-            const chunks = [];
-            for (let i = 0; i < followedIds.length; i += 10) {
-              chunks.push(followedIds.slice(i, i + 10));
-            }
+          try {
+            const followedIds = await socialService.getFollowedUserIds();
             
-            for (const chunk of chunks) {
-              const q = query(
-                collection(db, 'postcards'),
-                where('creatorId', 'in', chunk),
-                where('collectionVisibility', '==', 'public'),
-                where('profilePrivacy', '==', 'public'),
-                limit(10)
-              );
-              try {
-                const snap = await getDocs(q);
-                followedPostcards.push(...snap.docs.map(doc => ({ 
-                  id: doc.id, 
-                  ...doc.data(),
-                  date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-                })));
-              } catch (err) {
-                handleFirestoreError(err, OperationType.LIST, 'postcards_feed');
+            // Fetch postcards from followed users
+            let followedPostcards: any[] = [];
+            if (followedIds.length > 0) {
+              const chunks = [];
+              for (let i = 0; i < followedIds.length; i += 10) {
+                chunks.push(followedIds.slice(i, i + 10));
+              }
+              
+              for (const chunk of chunks) {
+                const q = query(
+                  collection(db, 'postcards'),
+                  where('creatorId', 'in', chunk),
+                  where('collectionVisibility', '==', 'public'),
+                  where('profilePrivacy', '==', 'public'),
+                  limit(10)
+                );
+                try {
+                  const snap = await getDocs(q);
+                  followedPostcards.push(...snap.docs.map(doc => ({ 
+                    id: doc.id, 
+                    ...doc.data(),
+                    date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+                  })));
+                } catch (err) {
+                  console.error('Error fetching followed postcards chunk:', err);
+                }
               }
             }
-          }
 
-          // Fetch postcards from invited private collections
-          const invitedCollectionsQuery = query(
-            collection(db, 'collections'),
-            where('privacy', '==', 'personal'),
-            where('allowedUsers', 'array-contains', auth.currentUser.email),
-            limit(10)
-          );
-          const invitedCollectionsSnap = await getDocs(invitedCollectionsQuery);
-          const invitedCollectionIds = invitedCollectionsSnap.docs.map(doc => doc.id);
-
-          let invitedPostcards: any[] = [];
-          if (invitedCollectionIds.length > 0) {
-            const chunks = [];
-            for (let i = 0; i < invitedCollectionIds.length; i += 10) {
-              chunks.push(invitedCollectionIds.slice(i, i + 10));
-            }
-            for (const chunk of chunks) {
-              const q = query(
-                collection(db, 'postcards'),
-                where('collectionId', 'in', chunk),
+            // Fetch postcards from invited private collections
+            let invitedPostcards: any[] = [];
+            try {
+              const invitedCollectionsQuery = query(
+                collection(db, 'collections'),
+                where('privacy', '==', 'personal'),
+                where('allowedUsers', 'array-contains', auth.currentUser.email),
                 limit(10)
               );
-              try {
-                const snap = await getDocs(q);
-                invitedPostcards.push(...snap.docs.map(doc => ({ 
-                  id: doc.id, 
-                  ...doc.data(),
-                  date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-                })));
-              } catch (err) {
-                handleFirestoreError(err, OperationType.LIST, 'postcards_invited');
-              }
-            }
-            
-            // Sort client-side
-            invitedPostcards.sort((a: any, b: any) => {
-              const dateA = a.createdAt?.toDate?.()?.getTime() || new Date(a.createdAt).getTime() || 0;
-              const dateB = b.createdAt?.toDate?.()?.getTime() || new Date(b.createdAt).getTime() || 0;
-              return dateB - dateA;
-            });
-          }
+              const invitedCollectionsSnap = await getDocs(invitedCollectionsQuery);
+              const invitedCollectionIds = invitedCollectionsSnap.docs.map(doc => doc.id);
 
-          // Combine and sort by date
-          const combined = [...followedPostcards, ...invitedPostcards]
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          
-          setFeedPostcards(combined);
+              if (invitedCollectionIds.length > 0) {
+                const chunks = [];
+                for (let i = 0; i < invitedCollectionIds.length; i += 10) {
+                  chunks.push(invitedCollectionIds.slice(i, i + 10));
+                }
+                for (const chunk of chunks) {
+                  const q = query(
+                    collection(db, 'postcards'),
+                    where('collectionId', 'in', chunk),
+                    limit(10)
+                  );
+                  try {
+                    const snap = await getDocs(q);
+                    invitedPostcards.push(...snap.docs.map(doc => ({ 
+                      id: doc.id, 
+                      ...doc.data(),
+                      date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+                    })));
+                  } catch (err) {
+                    console.error('Error fetching invited postcards chunk:', err);
+                  }
+                }
+                
+                // Sort client-side
+                invitedPostcards.sort((a: any, b: any) => {
+                  const dateA = a.createdAt?.toDate?.()?.getTime() || new Date(a.createdAt).getTime() || 0;
+                  const dateB = b.createdAt?.toDate?.()?.getTime() || new Date(b.createdAt).getTime() || 0;
+                  return dateB - dateA;
+                });
+              }
+            } catch (err) {
+              console.error('Error fetching invited collections/postcards:', err);
+            }
+
+            // Combine and sort by date
+            const combined = [...followedPostcards, ...invitedPostcards]
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            
+            setFeedPostcards(combined);
+          } catch (err) {
+            console.error('Error in personalized feed logic:', err);
+          }
         }
 
       } catch (err) {
