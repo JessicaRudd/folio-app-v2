@@ -1,47 +1,96 @@
-# 🕊️ Folio (V2)
+# 🕊️ Folio
 ### The Private Home for Your Digital Postcards.
 
-Folio is a "Slow Social" platform designed for intentional memory sharing. It blends the intimacy of a diary with the aesthetic of a high-end editorial magazine. Unlike traditional social networks, Folio prioritizes the privacy of the curator and the friction-less experience of the guest.
+**Folio** is a "Slow Social" platform designed for intentional, high-fidelity memory sharing. It blends the intimacy of a personal diary with the aesthetic of a premium editorial magazine. Unlike traditional social networks, Folio prioritizes the privacy of the curator and a friction-less, ad-free experience for the guest.
 
-[**Live Demo**](https://curateyourfolio.com) | [**Support the Mission**](https://buymeacoffee.com/h9aq9muuyz)
+[**Join the Waitlist**](https://curateyourfolio.com) | [**Support the Mission**](https://buymeacoffee.com/h9aq9muuyz) | [**LinkedIn**](https://linkedin.com/company/curateyourfolio)
 
 ---
 
-## ✨ Key Features
-*   **Postcard Storytelling:** Curate photos, videos, and diary entries into elegant, magazine-style layouts.
-*   **Privacy-First Sharing:** Secure, token-based sharing allows guests to view your Folios without creating an account or giving away their data.
-*   **Editorial UX:** High-fidelity UI built for beauty and focus, moving away from algorithmic noise.
-*   **Multisensory Integration:** Seamlessly connect to Apple Music to curate a soundtrack for every experience.
-*   **Granular Control:** Invite "Curators" to collaborate on Folios or send secure "Guest Passes" to specific individuals.
+## 📢 Project Status: Private Early Access
+Folio is currently in an **intentional rollout phase**. We are onboarding a limited number of "Founding Members" to our Private Alpha to ensure the highest standards of privacy and performance.
+
+*   **Gatekeeper System:** Access to the full platform is currently restricted to invited curators.
+*   **Public Landing:** Visitors can join the waitlist at [curateyourfolio.com](https://curateyourfolio.com).
+
+---
+
+## ✨ Core Features
+
+### 📮 Digital Postcards
+Curate photos, videos, and diary entries into elegant, magazine-style "Postcards."
+*   **Editorial Layouts:** High-fidelity UI inspired by premium print publications (Kinfolk, Apple Journal).
+*   **Apple Music Integration:** Search and attach the perfect soundtrack to your postcards via MusicKit JS.
+*   **Multimedia Storytelling:** Seamless carousel support for photos and video.
+
+### 🛡️ Privacy & Sharing
+*   **The Guest Pass:** Share your "Folios" (collections) with friends and family using secure, individualized access tokens.
+*   **No-Auth Viewing:** Recipients can view your postcards on the web without creating an account, keeping the experience friction-less for them and private for you.
+*   **Soft-Verification:** Private links are protected via Email/SMS OTP (One-Time Passcode) to ensure only the intended audience has access.
+*   **Public Collections:** Curators can choose to toggle specific collections to "Public" for wider sharing.
+
+### 🖋️ Curator Experience
+*   **Diary Entries:** Write long-form, serif-styled reflections to accompany your visual media.
+*   **Revocation Control:** Real-time dashboard to manage who has access to your Folios and the ability to revoke "Guest Passes" instantly.
 
 ---
 
 ## 🏗️ Technical Architecture
-Folio is built on a modern, scalable, and cost-efficient Google Cloud stack.
+Folio is built as a **"Private Cloud Appliance,"** utilizing a modern, scalable Google Cloud stack designed for performance and cost-efficiency.
 
 *   **Frontend:** [Next.js](https://nextjs.org/) (App Router) + [Tailwind CSS](https://tailwindcss.com/)
-*   **State & Database:** [Google Firestore](https://firebase.google.com/docs/firestore)
-*   **Authentication:** [Firebase Auth](https://firebase.google.com/docs/auth) (for Creators)
-*   **Deployment:** [Google Cloud Run](https://cloud.google.com/run) using the **Docker Compose** specification.
-*   **Media Processing:** [Imgproxy](https://imgproxy.net/) sidecar for real-time WebP optimization and BlurHash generation.
-*   **CI/CD:** Automated via **GitHub Actions** with secret management through **GCP Secret Manager**.
-
----
-
-## 🚀 Deployment
-This repository is configured for automated deployment to Google Cloud Run. 
-
-1. **Local Development:**
-   ```bash
-   npm install
-   npm run dev
-   ```
-2. **Production Build:**
-   The `docker-compose.yaml` handles the multi-container orchestration of the Web frontend and the Image-processing sidecar.
+*   **Infrastructure:** Multi-container deployment via **Docker Compose for Cloud Run**.
+    *   **Container A (Web):** The Next.js editorial interface.
+    *   **Container B (Image-Proc):** [Imgproxy](https://imgproxy.net/) sidecar for real-time WebP optimization and BlurHash generation.
+*   **Database & Auth:** [Google Firestore](https://firebase.google.com/docs/firestore) + [Firebase Auth](https://firebase.google.com/docs/auth).
+*   **Storage:** [Google Cloud Storage](https://cloud.google.com/storage) with Cloud CDN for global asset delivery.
+*   **CI/CD:** Automated via **GitHub Actions** and **Google Cloud Build**.
 
 ---
 
 ## 🎨 Design Philosophy
-Folio is **Design-Led**. We use a "Premium Editorial" aesthetic—think Kinfolk meets Apple Journal. Our components are synced directly from **Stitch** mockups to maintain high visual fidelity.
+Folio is **Design-Led**. We believe that digital memories deserve the same care as physical heirlooms.
+*   **Stitch-Synced:** UI components are derived directly from high-fidelity [Stitch](https://stitch.so/) mockups.
+*   **Typography:** A refined pairing of **SF Pro Display** for UI and **New York (Serif)** for narrative content.
+*   **Motion:** Fluid transitions powered by **Framer Motion** to simulate the feel of a physical magazine.
 
-**Ready to update?** This new README will instantly elevate the perceived value of the project to anyone who visits your GitHub.
+---
+
+## 🚀 Getting Started
+
+### Local Development
+1.  **Clone the Repo:**
+    ```bash
+    git clone https://github.com/JessicaRudd/folio-app-v2.git
+    ```
+2.  **Environment Setup:**
+    Create a `.env.local` file with your Firebase, Apple MusicKit, and GCP credentials.
+3.  **Install & Run:**
+    ```bash
+    npm install
+    npm run dev
+    ```
+
+### Deployment
+This repo uses **Docker Compose for Cloud Run**. To deploy to production:
+```bash
+gcloud beta run deploy folio-v1 --compose=docker-compose.yaml --region=[REGION]
+```
+
+---
+
+## 🐞 Feedback & Bug Reporting
+We value the "Founding Member" feedback loop.
+*   **Bug Alerts:** If you encounter an issue, please use the **"Send Feedback"** button within the app. This automatically creates a logged issue in this repository with the necessary environment metadata.
+*   **Manual Issues:** You can also [open an issue](https://github.com/JessicaRudd/folio-app-v2/issues) directly on GitHub.
+
+---
+
+## ☕ Support the Mission
+Folio is independent and ad-free. We rely on the support of our community to keep the "Slow Social" movement alive. If you value this space, consider [Buying us a Stamp](https://buymeacoffee.com/h9aq9muuyz).
+
+---
+
+**Built with intention by [Jessica Rudd]**  
+*Preserving memories, protecting privacy.*  
+[curateyourfolio.com](https://curateyourfolio.com)
