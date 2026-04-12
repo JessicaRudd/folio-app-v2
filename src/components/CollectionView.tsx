@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, Lock, Users, Mail, ShieldCheck, Share2, Check } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, onSnapshot, serverTimestamp, updateDoc, arrayUnion } from 'firebase/firestore';
 import { CollectionGrid } from './CollectionGrid';
+import { FolioShareModal } from './FolioShareModal';
 import { Button } from './ui/Button';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -26,6 +28,8 @@ export const CollectionView = () => {
   const [step, setStep] = useState<'email' | 'otp'>('email');
   const [authLoading, setAuthLoading] = useState(false);
   const [shareData, setShareData] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isSharingFullFolio, setIsSharingFullFolio] = useState(false);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -53,6 +57,13 @@ export const CollectionView = () => {
 
     copyToClipboard(shareUrl, collection.id);
   };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!username) return;
@@ -363,16 +374,27 @@ export const CollectionView = () => {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <div className="max-w-7xl mx-auto px-6 pt-8">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => navigate('/')}
-          className="gap-2 text-charcoal/40 hover:text-charcoal transition-colors group"
-        >
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          Back to Home
-        </Button>
+      <div className="max-w-7xl mx-auto px-6 pt-8 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white group-hover:bg-sage transition-colors duration-500">
+              <span className="rotate-[-45deg] font-serif font-bold">F</span>
+            </div>
+            <h1 className="text-2xl font-serif tracking-tighter group-hover:text-sage transition-colors duration-500">Folio</h1>
+          </Link>
+
+          <div className="w-px h-4 bg-charcoal/10" />
+
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/')}
+            className="gap-2 text-charcoal/40 hover:text-charcoal transition-colors group"
+          >
+            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+            Back to Home
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white border-b border-charcoal/5 mt-8">
@@ -399,7 +421,13 @@ export const CollectionView = () => {
                     variant="outline" 
                     size="sm" 
                     className="gap-2 self-center md:self-auto"
-                    onClick={handleShareFolio}
+                    onClick={() => {
+                      if (currentUser && currentUser.uid === userProfile.id) {
+                        setIsSharingFullFolio(true);
+                      } else {
+                        handleShareFolio();
+                      }
+                    }}
                   >
                     {copied === 'folio' ? <Check size={16} className="text-sage" /> : <Share2 size={16} />}
                     {copied === 'folio' ? 'Link Copied' : 'Share Collections'}
@@ -454,6 +482,15 @@ export const CollectionView = () => {
           Shared Access &mdash; Powered by Folio
         </div>
       </footer>
+
+      <AnimatePresence>
+        {isSharingFullFolio && userProfile && (
+          <FolioShareModal 
+            user={userProfile}
+            onClose={() => setIsSharingFullFolio(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -3,10 +3,14 @@ import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Postcard } from './Postcard';
+import { ShareModal } from './ShareModal';
 import { MusicVibePlayer } from './MusicVibePlayer';
 import { motion } from 'motion/react';
 import { Globe, ArrowLeft, Share2, Check } from 'lucide-react';
 import { Button } from './ui/Button';
+import { auth } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { AnimatePresence } from 'motion/react';
 
 export const PublicCollectionView = () => {
   const { collectionId } = useParams<{ collectionId: string }>();
@@ -16,6 +20,8 @@ export const PublicCollectionView = () => {
   const [collectionData, setCollectionData] = useState<any>(null);
   const [creator, setCreator] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isSharing, setIsSharing] = useState(false);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -24,6 +30,13 @@ export const PublicCollectionView = () => {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -154,7 +167,14 @@ export const PublicCollectionView = () => {
     <div className="min-h-screen bg-white">
       {/* Navigation */}
       <div className="absolute top-0 left-0 right-0 z-50 px-6 py-8 flex items-center justify-between pointer-events-none">
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex items-center gap-4">
+          <Link to="/" className="flex items-center gap-2 group bg-black/20 backdrop-blur-md px-4 py-2 rounded-full">
+            <div className="w-6 h-6 bg-white rounded-sm rotate-45 flex items-center justify-center text-charcoal group-hover:bg-sage group-hover:text-white transition-all duration-500">
+              <span className="rotate-[-45deg] text-[10px] font-serif font-bold">F</span>
+            </div>
+            <span className="text-lg font-serif tracking-tighter text-white group-hover:text-sage transition-colors duration-500">Folio</span>
+          </Link>
+          
           <Link 
             to="/"
             className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/60 hover:text-white transition-colors flex items-center gap-2 group bg-black/20 backdrop-blur-md px-4 py-2 rounded-full"
@@ -220,7 +240,13 @@ export const PublicCollectionView = () => {
                 variant="outline" 
                 size="sm" 
                 className="gap-2 bg-white/80 backdrop-blur-sm"
-                onClick={handleShare}
+                onClick={() => {
+                  if (currentUser && currentUser.uid === collectionData.creatorId) {
+                    setIsSharing(true);
+                  } else {
+                    handleShare();
+                  }
+                }}
               >
                 {copied ? <Check size={16} className="text-sage" /> : <Share2 size={16} />}
                 {copied ? 'Link Copied' : 'Share Collection'}
@@ -264,6 +290,15 @@ export const PublicCollectionView = () => {
           </div>
         </div>
       </footer>
+
+      <AnimatePresence>
+        {isSharing && collectionData && (
+          <ShareModal 
+            collection={{ id: collectionId, ...collectionData }}
+            onClose={() => setIsSharing(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

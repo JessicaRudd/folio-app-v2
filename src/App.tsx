@@ -283,6 +283,7 @@ function CreatorDashboard() {
         onLogout={handleLogout} 
         onCreate={handleCreatePostcard} 
         onFeedback={() => setIsFeedbackOpen(true)}
+        onLogoClick={() => setView('grid')}
       />
 
       <AnimatePresence>

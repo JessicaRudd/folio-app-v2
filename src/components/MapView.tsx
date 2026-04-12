@@ -7,7 +7,7 @@ import { MapPin, Loader2, ArrowLeft, ImageIcon, Calendar, Music } from 'lucide-r
 import { db, auth } from '../lib/firebase';
 import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { Button } from './ui/Button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 // Fix for default marker icons in Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -126,14 +126,25 @@ export const MapView = () => {
     <div className="h-screen flex flex-col bg-canvas overflow-hidden">
       {/* Header */}
       <header className="bg-white border-b border-charcoal/5 px-6 py-4 flex items-center justify-between z-[1000]">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
-            <ArrowLeft size={18} /> Back
-          </Button>
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white group-hover:bg-sage transition-colors duration-500">
+              <span className="rotate-[-45deg] font-serif font-bold">F</span>
+            </div>
+            <h1 className="text-2xl font-serif tracking-tighter group-hover:text-sage transition-colors duration-500">Folio</h1>
+          </Link>
+
           <div className="h-6 w-px bg-charcoal/5" />
-          <div className="flex items-center gap-2">
-            <MapPin className="text-sage" size={20} />
-            <h1 className="text-xl font-serif">Memory Map</h1>
+
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
+              <ArrowLeft size={18} /> Back
+            </Button>
+            <div className="h-6 w-px bg-charcoal/5" />
+            <div className="flex items-center gap-2">
+              <MapPin className="text-sage" size={20} />
+              <h1 className="text-xl font-serif">Memory Map</h1>
+            </div>
           </div>
         </div>
         <div className="text-xs font-bold uppercase tracking-widest text-charcoal/40">

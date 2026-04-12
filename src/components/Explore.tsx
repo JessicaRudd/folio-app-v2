@@ -4,6 +4,7 @@ import { Globe, Search, Loader2, User, MapPin, Calendar, ArrowLeft, ChevronRight
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { CollectionGrid } from './CollectionGrid';
+import { ShareModal } from './ShareModal';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Postcard } from './Postcard';
@@ -29,6 +30,7 @@ export const Explore = () => {
   const [feedPostcards, setFeedPostcards] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [user, setUser] = useState<any>(null);
+  const [sharingCollection, setSharingCollection] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
@@ -254,13 +256,24 @@ export const Explore = () => {
       
       {/* Navigation Bar / Breadcrumb */}
       <div className="max-w-7xl mx-auto px-6 pt-12 flex items-center justify-between">
-        <Link 
-          to="/"
-          className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
-        >
-          <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
-          Home
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white group-hover:bg-sage transition-colors duration-500">
+              <span className="rotate-[-45deg] font-serif font-bold">F</span>
+            </div>
+            <h1 className="text-2xl font-serif tracking-tighter group-hover:text-sage transition-colors duration-500">Folio</h1>
+          </Link>
+
+          <div className="w-px h-4 bg-charcoal/10" />
+
+          <Link 
+            to="/"
+            className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
+          >
+            <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
+            Home
+          </Link>
+        </div>
         <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/10">
           Discovery Engine &mdash; Curated Collections
         </div>
@@ -379,9 +392,13 @@ export const Explore = () => {
                   collections={filteredCollections} 
                   onSelect={(id) => navigate(`/s/${id}`)} 
                   onShare={(collection) => {
-                    const url = `${window.location.origin}/s/${collection.id}`;
-                    navigator.clipboard.writeText(url);
-                    alert('Link copied to clipboard!');
+                    if (user && user.uid === collection.creatorId) {
+                      setSharingCollection(collection);
+                    } else {
+                      const url = `${window.location.origin}/s/${collection.id}`;
+                      navigator.clipboard.writeText(url);
+                      alert('Link copied to clipboard!');
+                    }
                   }}
                   showCreator={true}
                 />
@@ -491,6 +508,15 @@ export const Explore = () => {
             isOpen={isFeedbackOpen} 
             onClose={() => setIsFeedbackOpen(false)} 
             user={user}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sharingCollection && (
+          <ShareModal 
+            collection={sharingCollection}
+            onClose={() => setSharingCollection(null)}
           />
         )}
       </AnimatePresence>

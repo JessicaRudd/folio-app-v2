@@ -25,7 +25,7 @@ interface FolioShareModalProps {
 }
 
 export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose }) => {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [folioMetadata, setFolioMetadata] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -213,10 +213,10 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
     }
   };
 
-  const copyLink = (text: string) => {
+  const copyLink = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
   };
 
   return (
@@ -317,8 +317,8 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/f/${user.username}/invite/${share.id}?token=${share.token}`)}>
-                        <Copy size={16} />
+                      <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/f/${user.username}/invite/${share.id}?token=${share.token}`, share.id)}>
+                        {copied === share.id ? <Check size={16} className="text-sage" /> : <Copy size={16} />}
                       </Button>
                       <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => revokeShare(share.id)}>
                         <Trash2 size={16} />
@@ -356,8 +356,8 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
                   <div className="flex-1 truncate text-sm text-sage font-mono">
                     {folioUrl}
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => copyLink(folioUrl)}>
-                    {copied ? <Check size={16} className="text-sage" /> : <Copy size={16} />}
+                  <Button variant="ghost" size="sm" onClick={() => copyLink(folioUrl, 'public-folio')}>
+                    {copied === 'public-folio' ? <Check size={16} className="text-sage" /> : <Copy size={16} />}
                   </Button>
                 </div>
                 <Button 

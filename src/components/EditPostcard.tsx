@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Music, MapPin, Send, Loader2, ChevronLeft, ChevronRight, Navigation, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Music, MapPin, Send, Loader2, ChevronLeft, ChevronRight, Navigation, Trash2, AlertTriangle, Plus, Image as ImageIcon } from 'lucide-react';
 import { Button } from './ui/Button';
-import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { db, auth, storage, handleFirestoreError, OperationType } from '../lib/firebase';
+import { doc, updateDoc, getDoc, increment } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { cn } from '../lib/utils';
+import { APP_LIMITS } from '../constants';
 
 import { MusicVibeSelector } from './MusicVibeSelector';
 
@@ -34,7 +36,8 @@ interface EditPostcardProps {
 
 export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps) => {
   const [loading, setLoading] = useState(false);
-  const [mediaUrls, setMediaUrls] = useState<string[]>(postcard.mediaUrls);
+  const [mediaItems, setMediaItems] = useState<(string | File)[]>(postcard.mediaUrls);
+  const [previewUrls, setPreviewUrls] = useState<string[]>(postcard.mediaUrls);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [caption, setCaption] = useState(postcard.caption);
   const [location, setLocation] = useState(postcard.location || '');
@@ -42,6 +45,87 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
   const [musicVibe, setMusicVibe] = useState<MusicVibe | null>(postcard.musicVibe || null);
   
   const [showPhotoDeleteConfirm, setShowPhotoDeleteConfirm] = useState(false);
+  const [userStats, setUserStats] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      if (!auth.currentUser) return;
+      try {
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (userDoc.exists()) {
+          setUserStats(userDoc.data());
+        }
+      } catch (err) {
+        console.error('Error fetching user stats:', err);
+      }
+    };
+    fetchUserStats();
+  }, []);
+
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas to Blob failed'));
+          }, 'image/jpeg', 0.7); // 70% quality
+        };
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      const limits = userStats?.role === 'admin' ? APP_LIMITS.ADMIN : (userStats?.isPremium ? APP_LIMITS.PREMIUM : APP_LIMITS.FREE);
+      const totalItems = mediaItems.length + files.length;
+      
+      if (totalItems > limits.MAX_PHOTOS_PER_POSTCARD) {
+        alert(`Your account is limited to ${limits.MAX_PHOTOS_PER_POSTCARD} photos per postcard.`);
+        const allowedCount = limits.MAX_PHOTOS_PER_POSTCARD - mediaItems.length;
+        if (allowedCount <= 0) return;
+        
+        const allowedFiles = files.slice(0, allowedCount);
+        setMediaItems(prev => [...prev, ...allowedFiles]);
+        const urls = allowedFiles.map(file => URL.createObjectURL(file));
+        setPreviewUrls(prev => [...prev, ...urls]);
+      } else {
+        setMediaItems(prev => [...prev, ...files]);
+        const urls = files.map(file => URL.createObjectURL(file));
+        setPreviewUrls(prev => [...prev, ...urls]);
+      }
+    }
+  };
 
   // Geolocation State
   const [isLocating, setIsLocating] = useState(false);
@@ -112,7 +196,7 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
   };
 
   const handleDeletePhoto = () => {
-    if (mediaUrls.length <= 1) {
+    if (mediaItems.length <= 1) {
       alert("A postcard must have at least one photo.");
       return;
     }
@@ -120,11 +204,22 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
   };
 
   const confirmDeletePhoto = () => {
-    const newUrls = [...mediaUrls];
-    newUrls.splice(currentPreviewIndex, 1);
-    setMediaUrls(newUrls);
-    if (currentPreviewIndex >= newUrls.length) {
-      setCurrentPreviewIndex(Math.max(0, newUrls.length - 1));
+    const newItems = [...mediaItems];
+    const newPreviews = [...previewUrls];
+    
+    // Revoke object URL if it's a File
+    if (newItems[currentPreviewIndex] instanceof File) {
+      URL.revokeObjectURL(newPreviews[currentPreviewIndex]);
+    }
+    
+    newItems.splice(currentPreviewIndex, 1);
+    newPreviews.splice(currentPreviewIndex, 1);
+    
+    setMediaItems(newItems);
+    setPreviewUrls(newPreviews);
+    
+    if (currentPreviewIndex >= newItems.length) {
+      setCurrentPreviewIndex(Math.max(0, newItems.length - 1));
     }
     setShowPhotoDeleteConfirm(false);
   };
@@ -134,12 +229,32 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
 
     setLoading(true);
     try {
+      // 1. Upload any new Files
+      const uploadPromises = mediaItems.map(async (item) => {
+        if (typeof item === 'string') return item;
+        
+        let uploadData: Blob | File = item;
+        if (item.type.startsWith('image/')) {
+          try {
+            uploadData = await compressImage(item);
+          } catch (e) {
+            console.error('Compression failed, uploading original:', e);
+          }
+        }
+        
+        const storageRef = ref(storage, `postcards/${auth.currentUser!.uid}/${Date.now()}_${item.name}`);
+        const uploadResult = await uploadBytes(storageRef, uploadData);
+        return getDownloadURL(uploadResult.ref);
+      });
+
+      const finalMediaUrls = await Promise.all(uploadPromises);
+
       const postcardRef = doc(db, 'postcards', postcard.id);
       
       const updates: any = {
         caption: caption || '',
         location: location || '',
-        mediaUrls: mediaUrls || [],
+        mediaUrls: finalMediaUrls,
         postcardDate: postcardDate || new Date().toISOString().split('T')[0],
         musicVibe: musicVibe || null,
         updatedAt: new Date().toISOString()
@@ -152,13 +267,14 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
 
       await updateDoc(postcardRef, updates);
 
-      // If photos were deleted, update the collection count
-      const photoDiff = postcard.mediaUrls.length - mediaUrls.length;
-      if (photoDiff > 0 && postcard.collectionId !== 'loose-leaves') {
-        const { increment } = await import('firebase/firestore');
-        await updateDoc(doc(db, 'collections', postcard.collectionId), {
-          photoCount: increment(-photoDiff)
-        });
+      // 2. Update collection photo count
+      if (postcard.collectionId !== 'loose-leaves') {
+        const photoDiff = finalMediaUrls.length - postcard.mediaUrls.length;
+        if (photoDiff !== 0) {
+          await updateDoc(doc(db, 'collections', postcard.collectionId), {
+            photoCount: increment(photoDiff)
+          });
+        }
       }
 
       onSuccess();
@@ -196,12 +312,20 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
           {/* Preview Carousel */}
           <div className="relative group aspect-square rounded-lg overflow-hidden bg-white shadow-inner border border-charcoal/5">
             <AnimatePresence mode="wait">
               <motion.img
                 key={currentPreviewIndex}
-                src={mediaUrls[currentPreviewIndex]}
+                src={previewUrls[currentPreviewIndex]}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -209,16 +333,16 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
               />
             </AnimatePresence>
             
-            {mediaUrls.length > 1 && (
+            {previewUrls.length > 1 && (
               <>
                 <button 
-                  onClick={() => setCurrentPreviewIndex(prev => (prev > 0 ? prev - 1 : mediaUrls.length - 1))}
+                  onClick={() => setCurrentPreviewIndex(prev => (prev > 0 ? prev - 1 : previewUrls.length - 1))}
                   className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <button 
-                  onClick={() => setCurrentPreviewIndex(prev => (prev < mediaUrls.length - 1 ? prev + 1 : 0))}
+                  onClick={() => setCurrentPreviewIndex(prev => (prev < previewUrls.length - 1 ? prev + 1 : 0))}
                   className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/80 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <ChevronRight size={20} />
@@ -235,7 +359,7 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
             </button>
 
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {mediaUrls.map((_, i) => (
+              {previewUrls.map((_, i) => (
                 <div 
                   key={i} 
                   className={cn(
@@ -245,6 +369,12 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
                 />
               ))}
             </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
+              <Plus size={16} /> Add More Photos
+            </Button>
           </div>
 
           {/* Form */}
@@ -291,7 +421,7 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
           <Button 
             variant="primary" 
             onClick={handleSubmit} 
-            disabled={loading || !caption || mediaUrls.length === 0}
+            disabled={loading || !caption || mediaItems.length === 0}
             className="gap-2"
           >
             {loading ? (

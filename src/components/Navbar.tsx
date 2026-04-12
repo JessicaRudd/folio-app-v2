@@ -30,9 +30,10 @@ interface NavbarProps {
   onLogout: () => void;
   onCreate: () => void;
   onFeedback: () => void;
+  onLogoClick?: () => void;
 }
 
-export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: NavbarProps) => {
+export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback, onLogoClick }: NavbarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -127,7 +128,7 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
       >
         {/* Logo */}
         <div className="flex items-center gap-12">
-          <Link to="/" className="flex items-center gap-2 group">
+          <Link to="/" className="flex items-center gap-2 group" onClick={onLogoClick}>
             <div className="w-8 h-8 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white group-hover:bg-sage transition-colors duration-500">
               <span className="rotate-[-45deg] font-serif font-bold">F</span>
             </div>
@@ -179,7 +180,17 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
                   className="absolute top-full right-0 mt-4 w-48 bg-white rounded-xl shadow-2xl border border-charcoal/5 p-2 overflow-hidden"
                 >
                   {tabletSecondary.map((link) => (
-                    link.path ? (
+                    link.external ? (
+                      <a
+                        key={link.name}
+                        href={link.path}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-charcoal/60 hover:text-sage hover:bg-sage/5 rounded-lg transition-all"
+                      >
+                        {link.icon} {link.name}
+                      </a>
+                    ) : link.path ? (
                       <Link
                         key={link.name}
                         to={link.path}
@@ -361,12 +372,12 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
               className="fixed inset-y-0 right-0 z-[70] w-full max-w-xs bg-canvas shadow-2xl lg:hidden flex flex-col"
             >
               <div className="p-6 flex items-center justify-between border-b border-charcoal/5">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white">
+                <Link to="/" className="flex items-center gap-2 group" onClick={() => setIsMobileMenuOpen(false)}>
+                  <div className="w-6 h-6 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white group-hover:bg-sage transition-colors">
                     <span className="rotate-[-45deg] text-[10px] font-serif font-bold">F</span>
                   </div>
-                  <h2 className="text-lg font-serif">Folio</h2>
-                </div>
+                  <h2 className="text-lg font-serif group-hover:text-sage transition-colors">Folio</h2>
+                </Link>
                 <button 
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="p-2 text-charcoal/40 hover:text-charcoal transition-colors"
@@ -398,7 +409,17 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback }: Navbar
                   <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/20">Support & Info</p>
                   <nav className="flex flex-col gap-4">
                     {filteredSecondary.map((link) => (
-                      link.path ? (
+                      link.external ? (
+                        <a
+                          key={link.name}
+                          href={link.path}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 text-sm font-bold uppercase tracking-widest text-charcoal/40 hover:text-sage transition-colors"
+                        >
+                          {link.icon} {link.name}
+                        </a>
+                      ) : link.path ? (
                         <Link
                           key={link.name}
                           to={link.path}

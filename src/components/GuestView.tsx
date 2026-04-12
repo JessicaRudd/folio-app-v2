@@ -371,15 +371,28 @@ export const GuestView = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-canvas px-6">
-        <div className="max-w-md w-full text-center space-y-6">
-          <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
-            <Lock className="text-sage" size={32} />
+      <div className="min-h-screen bg-canvas flex flex-col">
+        <div className="p-8">
+          <Link to="/" className="flex items-center gap-2 group w-fit">
+            <div className="w-8 h-8 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white group-hover:bg-sage transition-colors duration-500">
+              <span className="rotate-[-45deg] font-serif font-bold">F</span>
+            </div>
+            <h1 className="text-2xl font-serif tracking-tighter group-hover:text-sage transition-colors duration-500">Folio</h1>
+          </Link>
+        </div>
+        <div className="flex-1 flex items-center justify-center px-6">
+          <div className="max-w-md w-full text-center space-y-6">
+            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+              <Lock className="text-sage" size={32} />
+            </div>
+            <h2 className="text-4xl font-serif">Private Invite Only</h2>
+            <p className="text-charcoal/60 italic">
+              This Collection is private. If you were invited, please ensure you have the correct link.
+            </p>
+            <Button variant="ghost" onClick={() => navigate('/')} className="gap-2">
+              <ArrowLeft size={16} /> Back to Home
+            </Button>
           </div>
-          <h2 className="text-4xl font-serif">Private Invite Only</h2>
-          <p className="text-charcoal/60 italic">
-            This Collection is private. If you were invited, please ensure you have the correct link.
-          </p>
         </div>
       </div>
     );
@@ -387,22 +400,31 @@ export const GuestView = () => {
 
   if (!isVerified && shareData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-canvas px-6">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-xl space-y-8 text-center"
-        >
-          <div className="w-16 h-16 bg-sage/10 text-sage rounded-2xl flex items-center justify-center mx-auto">
-            <ShieldCheck size={32} />
-          </div>
-          
-          <div className="space-y-2">
-            <h2 className="text-3xl font-serif">Guest Pass</h2>
-            <p className="text-sm text-charcoal/60 italic">
-              Verification required to view <span className="font-bold text-charcoal not-italic">{collectionData?.title}</span>
-            </p>
-          </div>
+      <div className="min-h-screen bg-canvas flex flex-col">
+        <div className="p-8">
+          <Link to="/" className="flex items-center gap-2 group w-fit">
+            <div className="w-8 h-8 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white group-hover:bg-sage transition-colors duration-500">
+              <span className="rotate-[-45deg] font-serif font-bold">F</span>
+            </div>
+            <h1 className="text-2xl font-serif tracking-tighter group-hover:text-sage transition-colors duration-500">Folio</h1>
+          </Link>
+        </div>
+        <div className="flex-1 flex items-center justify-center px-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-xl space-y-8 text-center"
+          >
+            <div className="w-16 h-16 bg-sage/10 text-sage rounded-2xl flex items-center justify-center mx-auto">
+              <ShieldCheck size={32} />
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-3xl font-serif">Guest Pass</h2>
+              <p className="text-sm text-charcoal/60 italic">
+                Verification required to view <span className="font-bold text-charcoal not-italic">{collectionData?.title}</span>
+              </p>
+            </div>
 
           <AnimatePresence mode="wait">
             {step === 'email' ? (
@@ -478,6 +500,7 @@ export const GuestView = () => {
           </p>
         </motion.div>
       </div>
+    </div>
     );
   }
 

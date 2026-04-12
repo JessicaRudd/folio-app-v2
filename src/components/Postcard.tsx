@@ -138,6 +138,22 @@ export const Postcard = ({
     setIsDeleting(true);
     try {
       await deleteDoc(doc(db, 'postcards', id));
+
+      // Update collection counts
+      if (collectionId !== 'loose-leaves') {
+        const { increment } = await import('firebase/firestore');
+        await updateDoc(doc(db, 'collections', collectionId), {
+          postcardCount: increment(-1),
+          photoCount: increment(-localMediaUrls.length)
+        });
+      }
+
+      // Update user stats
+      const { increment } = await import('firebase/firestore');
+      await updateDoc(doc(db, 'users', creatorId), {
+        total_postcard_count: increment(-1)
+      });
+
       setShowDeleteConfirm(false);
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `postcards/${id}`);
@@ -162,6 +178,15 @@ export const Postcard = ({
       await updateDoc(doc(db, 'postcards', id), {
         mediaUrls: newUrls
       });
+
+      // Update collection photo count
+      if (collectionId !== 'loose-leaves') {
+        const { increment } = await import('firebase/firestore');
+        await updateDoc(doc(db, 'collections', collectionId), {
+          photoCount: increment(-1)
+        });
+      }
+
       setLocalMediaUrls(newUrls);
       if (currentIndex >= newUrls.length) {
         setCurrentIndex(newUrls.length - 1);

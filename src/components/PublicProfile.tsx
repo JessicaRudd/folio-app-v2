@@ -5,6 +5,7 @@ import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus,
 import { auth, db } from '../lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { CollectionGrid } from './CollectionGrid';
+import { ShareModal } from './ShareModal';
 import { Button } from './ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
 import { socialService } from '../services/socialService';
@@ -24,6 +25,7 @@ export const PublicProfile = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [sharingCollection, setSharingCollection] = useState<any>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -173,6 +175,15 @@ export const PublicProfile = () => {
       {/* Navigation */}
       <div className="max-w-7xl mx-auto px-6 pt-8 flex items-center justify-between">
         <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 bg-charcoal rounded-sm rotate-45 flex items-center justify-center text-white group-hover:bg-sage transition-colors duration-500">
+              <span className="rotate-[-45deg] font-serif font-bold">F</span>
+            </div>
+            <h1 className="text-2xl font-serif tracking-tighter group-hover:text-sage transition-colors duration-500">Folio</h1>
+          </Link>
+
+          <div className="w-px h-4 bg-charcoal/10" />
+
           <Link 
             to="/"
             className="text-[10px] font-bold uppercase tracking-[0.3em] text-charcoal/40 hover:text-charcoal transition-colors flex items-center gap-2 group"
@@ -289,7 +300,13 @@ export const PublicProfile = () => {
             onSelect={(id) => {
               navigate(`/v/${id}/public`);
             }} 
-            onShare={handleShareCollection}
+            onShare={(collection) => {
+              if (currentUser && currentUser.uid === collection.creatorId) {
+                setSharingCollection(collection);
+              } else {
+                handleShareCollection(collection);
+              }
+            }}
           />
         )}
       </main>
@@ -300,6 +317,15 @@ export const PublicProfile = () => {
             isOpen={isFeedbackOpen} 
             onClose={() => setIsFeedbackOpen(false)} 
             user={currentUser}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sharingCollection && (
+          <ShareModal 
+            collection={sharingCollection}
+            onClose={() => setSharingCollection(null)}
           />
         )}
       </AnimatePresence>

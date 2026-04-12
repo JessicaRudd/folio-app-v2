@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Image as ImageIcon, Music, MapPin, Send, Loader2, Plus, ChevronLeft, ChevronRight, Navigation } from 'lucide-react';
+import { X, Image as ImageIcon, Music, MapPin, Send, Loader2, Plus, ChevronLeft, ChevronRight, Navigation, Globe, Lock, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 import { db, storage, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, increment, getDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { cn } from '../lib/utils';
 import EXIF from 'exif-js';
@@ -49,6 +49,13 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
   const [selectedCollectionId, setSelectedCollectionId] = useState<string>('loose-leaves');
   const [isCreatingNewCollection, setIsCreatingNewCollection] = useState(false);
   const [newCollectionTitle, setNewCollectionTitle] = useState('');
+  const [newCollectionPrivacy, setNewCollectionPrivacy] = useState<'public' | 'private' | 'personal'>('private');
+  const [newCollectionDescription, setNewCollectionDescription] = useState('');
+  const [newCollectionCoverIndex, setNewCollectionCoverIndex] = useState(0);
+  const [allowedUsers, setAllowedUsers] = useState<string[]>([]);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [selectedCollectionData, setSelectedCollectionData] = useState<any>(null);
+  const [updateExistingCollection, setUpdateExistingCollection] = useState(false);
 
   // Geolocation State
   const [isLocating, setIsLocating] = useState(false);
@@ -60,6 +67,40 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
 
   const [userStats, setUserStats] = useState<any>(null);
   const [folioMetadata, setFolioMetadata] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchCollectionData = async () => {
+      if (selectedCollectionId === 'loose-leaves' || isCreatingNewCollection) {
+        setSelectedCollectionData(null);
+        return;
+      }
+      try {
+        const snap = await getDoc(doc(db, 'collections', selectedCollectionId));
+        if (snap.exists()) {
+          setSelectedCollectionData(snap.id === 'loose-leaves' ? null : snap.data());
+          // Sync privacy if we want to allow updating existing
+          if (snap.id !== 'loose-leaves') {
+            setNewCollectionPrivacy(snap.data().privacy || 'private');
+            setAllowedUsers(snap.data().allowedUsers || []);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching collection data:', err);
+      }
+    };
+    fetchCollectionData();
+  }, [selectedCollectionId, isCreatingNewCollection]);
+
+  const handleAddUser = () => {
+    if (newUserEmail && !allowedUsers.includes(newUserEmail)) {
+      setAllowedUsers([...allowedUsers, newUserEmail]);
+      setNewUserEmail('');
+    }
+  };
+
+  const handleRemoveUser = (email: string) => {
+    setAllowedUsers(allowedUsers.filter(u => u !== email));
+  };
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -293,56 +334,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
 
     setLoading(true);
     try {
-      let finalCollectionId = selectedCollectionId;
-
-      // 1. Create New Collection if needed
-      if (isCreatingNewCollection && newCollectionTitle.trim()) {
-        // Check if the number of photos in this first postcard exceeds the collection limit
-        if (mediaFiles.length > limits.MAX_PHOTOS_PER_COLLECTION) {
-          alert(`This collection is limited to ${limits.MAX_PHOTOS_PER_COLLECTION} photos.`);
-          setLoading(false);
-          return;
-        }
-
-        const collectionDoc = await addDoc(collection(db, 'collections'), {
-          title: newCollectionTitle.trim(),
-          creatorId: auth.currentUser!.uid,
-          creatorName: userStats?.displayName || auth.currentUser!.displayName || '',
-          creatorUsername: userStats?.username || '',
-          createdAt: serverTimestamp(),
-          collectionDate: postcardDate,
-          postcardCount: 0,
-          photoCount: 0,
-          privacy: 'private',
-          visibility: 'private',
-          profilePrivacy: userStats?.profilePrivacy || 'private',
-          curators: {},
-          curatorIds: [],
-          folioToken: folioMetadata?.shareToken || ''
-        });
-        finalCollectionId = collectionDoc.id;
-        
-        // Increment Collection Count
-        await updateDoc(doc(db, 'users', auth.currentUser!.uid), {
-          total_collection_count: increment(1)
-        });
-      }
-
-      // 2. If adding to existing collection, check photo limit
-      if (!isCreatingNewCollection && finalCollectionId !== 'loose-leaves') {
-        const collectionSnap = await getDoc(doc(db, 'collections', finalCollectionId));
-        if (collectionSnap.exists()) {
-          const cData = collectionSnap.data();
-          const currentPhotoCount = cData.photoCount || 0;
-          if (currentPhotoCount + mediaFiles.length > limits.MAX_PHOTOS_PER_COLLECTION) {
-            alert(`This collection is limited to ${limits.MAX_PHOTOS_PER_COLLECTION} photos. It currently has ${currentPhotoCount}.`);
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
-      // 3. Upload All Media (with compression)
+      // 1. Upload All Media (with compression)
       console.log('Compressing and uploading media...');
       const uploadPromises = mediaFiles.map(async (file) => {
         let uploadData: Blob | File = file;
@@ -361,7 +353,59 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
       const downloadUrls = await Promise.all(uploadPromises);
       console.log('Media uploaded:', downloadUrls);
 
-      // 3. Create Postcard Doc
+      let finalCollectionId = selectedCollectionId;
+
+      // 2. Create New Collection if needed
+      if (isCreatingNewCollection && newCollectionTitle.trim()) {
+        // Check if the number of photos in this first postcard exceeds the collection limit
+        if (mediaFiles.length > limits.MAX_PHOTOS_PER_COLLECTION) {
+          alert(`This collection is limited to ${limits.MAX_PHOTOS_PER_COLLECTION} photos.`);
+          setLoading(false);
+          return;
+        }
+
+        const collectionDoc = await addDoc(collection(db, 'collections'), {
+          title: newCollectionTitle.trim(),
+          description: newCollectionDescription.trim(),
+          coverImage: downloadUrls[newCollectionCoverIndex] || downloadUrls[0],
+          creatorId: auth.currentUser!.uid,
+          creatorName: userStats?.displayName || auth.currentUser!.displayName || '',
+          creatorUsername: userStats?.username || '',
+          createdAt: serverTimestamp(),
+          collectionDate: postcardDate,
+          postcardCount: 0,
+          photoCount: 0,
+          privacy: newCollectionPrivacy,
+          visibility: newCollectionPrivacy === 'public' ? 'public' : 'private',
+          allowedUsers: newCollectionPrivacy === 'personal' ? allowedUsers : [],
+          profilePrivacy: userStats?.profilePrivacy || 'private',
+          curators: {},
+          curatorIds: [],
+          folioToken: folioMetadata?.shareToken || ''
+        });
+        finalCollectionId = collectionDoc.id;
+        
+        // Increment Collection Count
+        await updateDoc(doc(db, 'users', auth.currentUser!.uid), {
+          total_collection_count: increment(1)
+        });
+      }
+
+      // 3. If adding to existing collection, check photo limit
+      if (!isCreatingNewCollection && finalCollectionId !== 'loose-leaves') {
+        const collectionSnap = await getDoc(doc(db, 'collections', finalCollectionId));
+        if (collectionSnap.exists()) {
+          const cData = collectionSnap.data();
+          const currentPhotoCount = cData.photoCount || 0;
+          if (currentPhotoCount + mediaFiles.length > limits.MAX_PHOTOS_PER_COLLECTION) {
+            alert(`This collection is limited to ${limits.MAX_PHOTOS_PER_COLLECTION} photos. It currently has ${currentPhotoCount}.`);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // 4. Create Postcard Doc
       const secureToken = crypto.randomUUID();
       console.log('Creating Firestore document...');
       
@@ -377,6 +421,35 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           collectionVisibility = cData.visibility || 'private';
           collectionPrivacy = cData.privacy || 'private';
           folioToken = cData.folioToken || folioToken;
+
+          // Update existing collection if requested
+          if (updateExistingCollection) {
+            const collectionUpdates: any = {
+              privacy: newCollectionPrivacy,
+              visibility: newCollectionPrivacy === 'public' ? 'public' : 'private',
+              allowedUsers: newCollectionPrivacy === 'personal' ? allowedUsers : [],
+              coverImage: downloadUrls[newCollectionCoverIndex] || downloadUrls[0],
+              updatedAt: serverTimestamp()
+            };
+            await updateDoc(doc(db, 'collections', finalCollectionId), collectionUpdates);
+            
+            // Sync privacy to all postcards in this collection if it changed
+            if (newCollectionPrivacy !== cData.privacy || collectionUpdates.visibility !== cData.visibility) {
+              const postcardsQuery = query(collection(db, 'postcards'), where('collectionId', '==', finalCollectionId));
+              const postcardsSnap = await getDocs(postcardsQuery);
+              const batch = writeBatch(db);
+              postcardsSnap.docs.forEach(pDoc => {
+                batch.update(pDoc.ref, {
+                  collectionPrivacy: newCollectionPrivacy,
+                  collectionVisibility: collectionUpdates.visibility
+                });
+              });
+              await batch.commit();
+            }
+
+            collectionPrivacy = newCollectionPrivacy;
+            collectionVisibility = collectionUpdates.visibility;
+          }
         }
       }
 
@@ -588,24 +661,221 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
                   </div>
 
                   {isCreatingNewCollection ? (
-                    <input
-                      type="text"
-                      value={newCollectionTitle}
-                      onChange={(e) => setNewCollectionTitle(e.target.value)}
-                      placeholder="Enter collection title..."
-                      className="w-full p-3 bg-canvas rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all"
-                    />
+                    <div className="space-y-4">
+                      <input
+                        type="text"
+                        value={newCollectionTitle}
+                        onChange={(e) => setNewCollectionTitle(e.target.value)}
+                        placeholder="Enter collection title..."
+                        className="w-full p-3 bg-canvas rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all"
+                      />
+                      <textarea
+                        value={newCollectionDescription}
+                        onChange={(e) => setNewCollectionDescription(e.target.value)}
+                        placeholder="Collection description (optional)..."
+                        className="w-full p-3 bg-canvas rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all h-20 resize-none text-sm"
+                      />
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Collection Privacy</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => setNewCollectionPrivacy('private')}
+                            className={cn(
+                              "p-3 rounded-lg border-2 text-left transition-all flex flex-col gap-1",
+                              newCollectionPrivacy === 'private' ? "border-sage bg-sage/5" : "border-charcoal/5 hover:border-charcoal/10"
+                            )}
+                          >
+                            <Lock size={14} className={newCollectionPrivacy === 'private' ? "text-sage" : "text-charcoal/40"} />
+                            <span className="text-[10px] font-bold">Private</span>
+                          </button>
+                          <button
+                            onClick={() => setNewCollectionPrivacy('personal')}
+                            className={cn(
+                              "p-3 rounded-lg border-2 text-left transition-all flex flex-col gap-1",
+                              newCollectionPrivacy === 'personal' ? "border-sage bg-sage/5" : "border-charcoal/5 hover:border-charcoal/10"
+                            )}
+                          >
+                            <Plus size={14} className={newCollectionPrivacy === 'personal' ? "text-sage" : "text-charcoal/40"} />
+                            <span className="text-[10px] font-bold">Personal</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (userStats?.profilePrivacy !== 'public') {
+                                alert("You must set your profile to Public in Settings to create public collections.");
+                                return;
+                              }
+                              setNewCollectionPrivacy('public');
+                            }}
+                            className={cn(
+                              "p-3 rounded-lg border-2 text-left transition-all flex flex-col gap-1",
+                              newCollectionPrivacy === 'public' ? "border-sage bg-sage/5" : "border-charcoal/5 hover:border-charcoal/10"
+                            )}
+                          >
+                            <Globe size={14} className={newCollectionPrivacy === 'public' ? "text-sage" : "text-charcoal/40"} />
+                            <span className="text-[10px] font-bold">Public</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {newCollectionPrivacy === 'personal' && (
+                        <div className="p-4 bg-charcoal/5 rounded-lg space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Invite Guests</label>
+                            <span className="text-[10px] text-charcoal/40">{allowedUsers.length} added</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="email"
+                              value={newUserEmail}
+                              onChange={(e) => setNewUserEmail(e.target.value)}
+                              placeholder="Guest email..."
+                              className="flex-1 p-2 bg-white rounded border border-charcoal/5 text-xs outline-none"
+                              onKeyPress={(e) => e.key === 'Enter' && handleAddUser()}
+                            />
+                            <Button variant="secondary" size="sm" onClick={handleAddUser} className="h-8 w-8 p-0">
+                              <Plus size={14} />
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {allowedUsers.map(email => (
+                              <div key={email} className="flex items-center gap-1 bg-white px-2 py-1 rounded text-[10px] border border-charcoal/5">
+                                <span>{email}</span>
+                                <button onClick={() => handleRemoveUser(email)} className="text-red-500 hover:text-red-700">
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Collection Cover</label>
+                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                          {previewUrls.map((url, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setNewCollectionCoverIndex(idx)}
+                              className={cn(
+                                "relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition-all",
+                                newCollectionCoverIndex === idx ? "border-sage scale-105" : "border-transparent opacity-60 hover:opacity-100"
+                              )}
+                            >
+                              <img src={url} className="w-full h-full object-cover" />
+                              {newCollectionCoverIndex === idx && (
+                                <div className="absolute inset-0 bg-sage/20 flex items-center justify-center">
+                                  <div className="w-2 h-2 bg-white rounded-full" />
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   ) : (
-                    <select
-                      value={selectedCollectionId}
-                      onChange={(e) => setSelectedCollectionId(e.target.value)}
-                      className="w-full p-3 bg-canvas rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all appearance-none"
-                    >
-                      <option value="loose-leaves">Loose Leaves (Default)</option>
-                      {collections.map(f => (
-                        <option key={f.id} value={f.id}>{f.title}</option>
-                      ))}
-                    </select>
+                    <div className="space-y-4">
+                      <select
+                        value={selectedCollectionId}
+                        onChange={(e) => setSelectedCollectionId(e.target.value)}
+                        className="w-full p-3 bg-canvas rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 outline-none transition-all appearance-none"
+                      >
+                        <option value="loose-leaves">Loose Leaves (Default)</option>
+                        {collections.map(f => (
+                          <option key={f.id} value={f.id}>{f.title}</option>
+                        ))}
+                      </select>
+
+                      {selectedCollectionId !== 'loose-leaves' && selectedCollectionData && (
+                        <div className="space-y-4 pt-2 border-t border-charcoal/5">
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="checkbox" 
+                              id="updateCollection" 
+                              checked={updateExistingCollection}
+                              onChange={(e) => setUpdateExistingCollection(e.target.checked)}
+                              className="w-4 h-4 rounded border-charcoal/20 text-sage focus:ring-sage"
+                            />
+                            <label htmlFor="updateCollection" className="text-xs font-bold text-charcoal/60 cursor-pointer">
+                              Update collection settings with this postcard
+                            </label>
+                          </div>
+
+                          {updateExistingCollection && (
+                            <motion.div 
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              className="space-y-4 overflow-hidden"
+                            >
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Update Privacy</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <button
+                                    onClick={() => setNewCollectionPrivacy('private')}
+                                    className={cn(
+                                      "p-3 rounded-lg border-2 text-left transition-all flex flex-col gap-1",
+                                      newCollectionPrivacy === 'private' ? "border-sage bg-sage/5" : "border-charcoal/5 hover:border-charcoal/10"
+                                    )}
+                                  >
+                                    <Lock size={14} className={newCollectionPrivacy === 'private' ? "text-sage" : "text-charcoal/40"} />
+                                    <span className="text-[10px] font-bold">Private</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setNewCollectionPrivacy('personal')}
+                                    className={cn(
+                                      "p-3 rounded-lg border-2 text-left transition-all flex flex-col gap-1",
+                                      newCollectionPrivacy === 'personal' ? "border-sage bg-sage/5" : "border-charcoal/5 hover:border-charcoal/10"
+                                    )}
+                                  >
+                                    <Plus size={14} className={newCollectionPrivacy === 'personal' ? "text-sage" : "text-charcoal/40"} />
+                                    <span className="text-[10px] font-bold">Personal</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (userStats?.profilePrivacy !== 'public') {
+                                        alert("You must set your profile to Public in Settings to create public collections.");
+                                        return;
+                                      }
+                                      setNewCollectionPrivacy('public');
+                                    }}
+                                    className={cn(
+                                      "p-3 rounded-lg border-2 text-left transition-all flex flex-col gap-1",
+                                      newCollectionPrivacy === 'public' ? "border-sage bg-sage/5" : "border-charcoal/5 hover:border-charcoal/10"
+                                    )}
+                                  >
+                                    <Globe size={14} className={newCollectionPrivacy === 'public' ? "text-sage" : "text-charcoal/40"} />
+                                    <span className="text-[10px] font-bold">Public</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Set as Collection Cover</label>
+                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                  {previewUrls.map((url, idx) => (
+                                    <button
+                                      key={idx}
+                                      onClick={() => setNewCollectionCoverIndex(idx)}
+                                      className={cn(
+                                        "relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition-all",
+                                        newCollectionCoverIndex === idx ? "border-sage scale-105" : "border-transparent opacity-60 hover:opacity-100"
+                                      )}
+                                    >
+                                      <img src={url} className="w-full h-full object-cover" />
+                                      {newCollectionCoverIndex === idx && (
+                                        <div className="absolute inset-0 bg-sage/20 flex items-center justify-center">
+                                          <div className="w-2 h-2 bg-white rounded-full" />
+                                        </div>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 

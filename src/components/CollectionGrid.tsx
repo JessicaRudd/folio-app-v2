@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { Card } from './ui/Card';
-import { Calendar, Image as ImageIcon, MapPin, User, Share2 } from 'lucide-react';
+import { Calendar, Image as ImageIcon, MapPin, User, Share2, Globe, Lock, Shield, Users } from 'lucide-react';
 import { Button } from './ui/Button';
 
 interface Collection {
@@ -15,6 +15,7 @@ interface Collection {
   location?: string;
   creatorName?: string;
   creatorUsername?: string;
+  creatorId?: string;
   privacy?: string;
 }
 
@@ -66,6 +67,27 @@ export const CollectionGrid = ({ collections, onSelect, onShare, showCreator = f
                 className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
                 referrerPolicy="no-referrer"
               />
+              <div className="absolute top-4 left-4 flex flex-col gap-2">
+                <div className="glass px-3 py-1 rounded-full flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
+                  {collection.privacy === 'public' ? (
+                    <>
+                      <Globe size={12} className="text-sage" />
+                      Public
+                    </>
+                  ) : collection.privacy === 'personal' ? (
+                    <>
+                      <Users size={12} className="text-sage" />
+                      Personal
+                    </>
+                  ) : (
+                    <>
+                      <Lock size={12} className="text-charcoal/40" />
+                      Private
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div className="absolute top-4 right-4 glass px-3 py-1 rounded-full flex flex-col items-end gap-0.5 text-[10px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <ImageIcon size={12} className="text-sage" />

@@ -44,7 +44,7 @@ interface ShareModalProps {
 
 export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionData, onClose }) => {
   const [activeTab, setActiveTab] = useState<'public' | 'private' | 'curators'>('public');
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [shares, setShares] = useState<any[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -113,10 +113,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
     }
   };
 
-  const copyLink = (text: string) => {
+  const copyLink = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
   };
 
   const createShare = async () => {
@@ -330,8 +330,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
                       <div className="flex-1 truncate text-sm text-sage font-mono">
                         {publicUrl}
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => copyLink(publicUrl)}>
-                        {copied ? <Check size={16} className="text-sage" /> : <Copy size={16} />}
+                      <Button variant="ghost" size="sm" onClick={() => copyLink(publicUrl, 'public-link')}>
+                        {copied === 'public-link' ? <Check size={16} className="text-sage" /> : <Copy size={16} />}
                       </Button>
                     </div>
                     <p className="text-xs text-charcoal/40 italic text-center">
@@ -430,8 +430,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/v/${share.collectionId}/${share.id}?token=${share.token}`)}>
-                            <Copy size={16} />
+                          <Button variant="ghost" size="sm" onClick={() => copyLink(`${window.location.origin}/v/${share.collectionId}/${share.id}?token=${share.token}`, share.id)}>
+                            {copied === share.id ? <Check size={16} className="text-sage" /> : <Copy size={16} />}
                           </Button>
                           <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => revokeShare(share.id)}>
                             <Trash2 size={16} />
