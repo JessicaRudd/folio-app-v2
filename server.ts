@@ -80,6 +80,21 @@ async function startServer() {
     }
   });
 
+  app.get("/api/admin/debug/waitlist", async (req, res) => {
+    const { email } = req.query;
+    if (!email || typeof email !== 'string') return res.status(400).json({ error: "Email is required" });
+
+    try {
+      const doc = await db.collection("waitlist").doc(email.toLowerCase()).get();
+      if (!doc.exists) {
+        return res.status(404).json({ error: "User not found in waitlist" });
+      }
+      res.json({ email, data: doc.data() });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Health Check Endpoint
   app.get("/api/health", (req, res) => {
     res.json({ 
@@ -290,7 +305,11 @@ async function startServer() {
 
   // Activation: Unlock
   app.get("/unlock", async (req, res) => {
-    const { token } = req.query;
+    let { token } = req.query;
+    if (typeof token === 'string') token = token.trim();
+    
+    console.log(`Unlock attempt with token: "${token}"`);
+    
     if (!token) return res.status(400).send("Token is required");
 
     try {
@@ -301,8 +320,22 @@ async function startServer() {
         .get();
 
       if (snapshot.empty) {
+        console.warn(`Unlock failed: No approved user found with token "${token}"`);
+        // Let's also check if the token exists but status isn't approved
+        const anyTokenSnap = await db.collection("waitlist")
+          .where("inviteToken", "==", token)
+          .limit(1)
+          .get();
+        
+        if (!anyTokenSnap.empty) {
+          const doc = anyTokenSnap.docs[0].data();
+          console.warn(`Token found but status is "${doc.status}" instead of "approved"`);
+        }
+
         return res.status(403).send("Invalid or expired invitation token");
       }
+
+      console.log(`Unlock successful for user: ${snapshot.docs[0].id}`);
 
       // Set secure, HTTP-only cookie
       res.cookie('folio_access_granted', 'true', {
