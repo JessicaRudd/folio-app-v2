@@ -1,16 +1,16 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import admin from "firebase-admin";
 import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
-import dotenv from "dotenv";
 import crypto from "crypto";
 import { handleReport } from "./src/services/reportService.ts";
 import { sendInviteEmail, sendOtpEmail } from "./src/services/emailService.ts";
 import { db, auth as adminAuth, adminApp } from "./src/lib/firebaseAdmin.ts";
 import firebaseAppletConfig from "./firebase-applet-config.json";
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -248,14 +248,27 @@ async function startServer() {
 
       // Send Invitation Email
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      await sendInviteEmail({ 
+      console.log(`Attempting to send invitation email to ${email.toLowerCase()} via ${baseUrl}`);
+      
+      const emailResult = await sendInviteEmail({ 
         email: email.toLowerCase(), 
         inviteToken,
         type: 'early-access',
         baseUrl
       });
 
-      res.json({ success: true, inviteToken });
+      if (emailResult.error) {
+        console.error(`Failed to send invitation email to ${email}:`, emailResult.error);
+      } else {
+        console.log(`Successfully sent invitation email to ${email}`);
+      }
+
+      res.json({ 
+        success: true, 
+        inviteToken,
+        emailSent: !emailResult.error,
+        emailError: emailResult.error
+      });
     } catch (error: any) {
       console.error("Error approving user. Details:", {
         message: error.message,
@@ -304,11 +317,19 @@ async function startServer() {
     const { shareId, email, collectionTitle, creatorName, shareUrl } = req.body;
     
     try {
-      await sendInviteEmail({ email, collectionTitle, creatorName, shareUrl });
+      console.log(`Attempting to send collection invite to ${email} for ${collectionTitle}`);
+      const result = await sendInviteEmail({ email, collectionTitle, creatorName, shareUrl });
+      
+      if (result.error) {
+        console.error(`Failed to send collection invite to ${email}:`, result.error);
+        return res.status(500).json({ error: result.error });
+      }
+      
+      console.log(`Successfully sent collection invite to ${email}`);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error in /api/shares/invite:", error);
-      res.status(500).json({ error: "Failed to send invite email" });
+      res.status(500).json({ error: error.message || "Failed to send invite email" });
     }
   });
 
@@ -350,9 +371,11 @@ async function startServer() {
       });
 
       if (emailResult?.error) {
+        console.error(`Failed to send OTP email to ${email}:`, emailResult.error);
         return res.status(500).json({ error: `Email service error: ${emailResult.error}` });
       }
       
+      console.log(`Successfully sent OTP email to ${email}`);
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error in /api/shares/send-otp:", error);

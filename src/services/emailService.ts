@@ -1,8 +1,26 @@
 import { Resend } from 'resend';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Folio <hello@curateyourfolio.com>';
-const BRAND_URL = process.env.RESEND_BRAND_URL || 'https://curateyourfolio.com';
+let resendClient: Resend | null = null;
+
+function getResend() {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.warn('RESEND_API_KEY is not set. Emails will not be sent.');
+      return null;
+    }
+    resendClient = new Resend(apiKey);
+  }
+  return resendClient;
+}
+
+function getFromEmail() {
+  return process.env.RESEND_FROM_EMAIL || 'Folio <hello@curateyourfolio.com>';
+}
+
+function getBrandUrl() {
+  return process.env.RESEND_BRAND_URL || 'https://curateyourfolio.com';
+}
 
 export async function sendInviteEmail({ 
   email, 
@@ -21,10 +39,9 @@ export async function sendInviteEmail({
   type?: 'collection' | 'early-access';
   baseUrl?: string;
 }) {
+  const resend = getResend();
   if (!resend) {
-    const msg = 'RESEND_API_KEY not set. Skipping email send.';
-    console.warn(msg);
-    return { error: msg };
+    return { error: 'RESEND_API_KEY not set' };
   }
 
   const isEarlyAccess = type === 'early-access';
@@ -32,7 +49,10 @@ export async function sendInviteEmail({
     ? "You've received your stamp! 🕊️"
     : `Invite: View ${collectionTitle} on Folio`;
 
-  const finalBaseUrl = baseUrl || BRAND_URL;
+  // Prioritize the environment variable BRAND_URL if it's explicitly set, 
+  // otherwise use the passed baseUrl (from request) or the default.
+  const envBrandUrl = process.env.RESEND_BRAND_URL;
+  const finalBaseUrl = envBrandUrl || baseUrl || getBrandUrl();
   const unlockUrl = `${finalBaseUrl}/unlock?token=${inviteToken}`;
 
   const html = isEarlyAccess ? `
@@ -87,7 +107,7 @@ export async function sendInviteEmail({
 
   try {
     const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: getFromEmail(),
       to: email,
       subject,
       html
@@ -113,15 +133,14 @@ export async function sendOtpEmail({
   otp: string; 
   collectionTitle: string;
 }) {
+  const resend = getResend();
   if (!resend) {
-    const msg = 'RESEND_API_KEY not set. Skipping email send.';
-    console.warn(msg);
-    return { error: msg };
+    return { error: 'RESEND_API_KEY not set' };
   }
 
   try {
     const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: getFromEmail(),
       to: email,
       subject: `Your Access Code for ${collectionTitle}`,
       html: `
@@ -136,7 +155,7 @@ export async function sendOtpEmail({
             </span>
           </div>
           <p style="font-size: 14px; color: #8a8a8a; margin-top: 40px; border-top: 1px solid #eee; pt: 20px;">
-            Sent via <a href="${BRAND_URL}" style="color: #4a5d4e; text-decoration: none;">${BRAND_URL.replace('https://', '')}</a>. This code will expire shortly.
+            Sent via <a href="${getBrandUrl()}" style="color: #4a5d4e; text-decoration: none;">${getBrandUrl().replace('https://', '')}</a>. This code will expire shortly.
           </p>
         </div>
       `
