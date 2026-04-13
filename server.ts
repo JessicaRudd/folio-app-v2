@@ -8,7 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { handleReport } from "./src/services/reportService.ts";
-import { sendInviteEmail, sendOtpEmail } from "./src/services/emailService.ts";
+import { sendInviteEmail, sendOtpEmail, sendWelcomeEmail } from "./src/services/emailService.ts";
 import { db, auth as adminAuth, adminApp } from "./src/lib/firebaseAdmin.ts";
 import firebaseAppletConfig from "./firebase-applet-config.json";
 
@@ -309,6 +309,26 @@ async function startServer() {
     } catch (error) {
       console.error("Error unlocking access:", error);
       res.status(500).send("Internal server error");
+    }
+  });
+
+  app.post("/api/auth/welcome", async (req, res) => {
+    const { email, name } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    try {
+      console.log(`Sending welcome email to ${email}`);
+      const result = await sendWelcomeEmail({ email, name });
+      
+      if (result.error) {
+        console.error(`Failed to send welcome email to ${email}:`, result.error);
+        return res.status(500).json({ error: result.error });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error in /api/auth/welcome:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 

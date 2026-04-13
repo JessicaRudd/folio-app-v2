@@ -183,6 +183,18 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
 
       // If sign up is successful, we let them in.
       // Gatekeeper will handle the access check.
+      
+      // Send welcome email
+      try {
+        await fetch('/api/auth/welcome', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: user.email, name: displayName })
+        });
+      } catch (emailErr) {
+        console.error("Failed to send welcome email:", emailErr);
+      }
+
       onSuccess();
     } catch (err: any) {
       setError(err.message);
@@ -235,6 +247,17 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
           });
         } catch (err: any) {
           handleFirestoreError(err, OperationType.WRITE, userPath);
+        }
+
+        // Send welcome email for new Google users
+        try {
+          await fetch('/api/auth/welcome', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: user.email, name: user.displayName })
+          });
+        } catch (emailErr) {
+          console.error("Failed to send welcome email:", emailErr);
         }
       }
       

@@ -188,3 +188,99 @@ export async function sendOtpEmail({
     return { error: error.message };
   }
 }
+
+export async function sendWelcomeEmail({ 
+  email, 
+  name 
+}: { 
+  email: string; 
+  name?: string; 
+}) {
+  const resend = getResend();
+  if (!resend) {
+    return { error: 'RESEND_API_KEY not set' };
+  }
+
+  const subject = "Welcome to Folio — Your private world of memories 🕊️";
+  const brandUrl = getBrandUrl();
+  
+  const html = `
+    <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto; padding: 60px 40px; background: #fdfcfb; color: #1a1a1a; border: 1px solid #eee; border-radius: 4px;">
+      <div style="text-align: center; margin-bottom: 40px;">
+        <div style="display: inline-block; width: 60px; height: 60px; border: 2px dashed #1a1a1a; border-radius: 50%; padding: 5px; margin-bottom: 20px;">
+          <div style="width: 100%; height: 100%; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+            <span style="color: white; font-weight: bold; font-size: 24px;">F</span>
+          </div>
+        </div>
+      </div>
+      
+      <h1 style="font-size: 28px; font-weight: normal; text-align: center; margin-bottom: 32px; letter-spacing: -0.02em;">Welcome to Folio${name ? `, ${name}` : ''}</h1>
+      
+      <p style="font-size: 18px; line-height: 1.8; margin-bottom: 24px; color: #444;">
+        We're delighted to have you join us. Folio is a privacy-forward social space designed for what matters most: sharing digital postcards of your most precious memories with the people who truly care.
+      </p>
+
+      <p style="font-size: 18px; line-height: 1.8; margin-bottom: 24px; color: #444;">
+        In a world of noisy feeds, Folio is your quiet corner. Here, you can curate private collections, share them securely, and keep your digital life intentional.
+      </p>
+      
+      <div style="text-align: center; margin: 60px 0;">
+        <a href="${brandUrl}" style="display: inline-block; background: #1a1a1a; color: white; padding: 20px 40px; text-decoration: none; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; font-size: 12px; border-radius: 4px;">
+          Create Your First Postcard
+        </a>
+      </div>
+
+      <div style="background: #f9f7f5; padding: 30px; border-radius: 8px; margin-bottom: 40px;">
+        <h3 style="font-size: 16px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; color: #1a1a1a;">Core Features</h3>
+        <ul style="font-size: 16px; line-height: 1.8; color: #444; padding-left: 20px;">
+          <li><strong>Private Collections:</strong> Organize your memories into beautiful, themed folios.</li>
+          <li><strong>Secure Sharing:</strong> Share via private links or access codes—you control who sees what.</li>
+          <li><strong>Privacy First:</strong> No tracking, no ads, just your memories.</li>
+        </ul>
+      </div>
+      
+      <div style="margin-top: 60px; padding-top: 30px; border-top: 1px solid #eee; text-align: center;">
+        <p style="font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.1em;">
+          Folio &copy; 2026 &mdash; <a href="${brandUrl}" style="color: #999; text-decoration: none;">curateyourfolio.com</a>
+        </p>
+      </div>
+    </div>
+  `;
+
+  const text = `
+Welcome to Folio${name ? `, ${name}` : ''}!
+
+Folio is a privacy-forward social app for sharing digital postcards. We're delighted to have you join us.
+
+Core Features:
+- Private Collections: Organize your memories into beautiful, themed folios.
+- Secure Sharing: Share via private links or access codes.
+- Privacy First: No tracking, no ads.
+
+Start curating your memories today at ${brandUrl}
+
+Folio © 2026
+  `.trim();
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: getFromEmail(),
+      to: email,
+      subject,
+      html,
+      text,
+      headers: {
+        'List-Unsubscribe': `<${brandUrl}>`
+      }
+    });
+
+    if (error) {
+      console.error('Resend error:', error);
+      return { error: error.message };
+    }
+    return { success: true, data };
+  } catch (error: any) {
+    console.error('Error sending welcome email:', error);
+    return { error: error.message };
+  }
+}
