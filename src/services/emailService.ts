@@ -100,7 +100,7 @@ export async function sendInviteEmail({
         </a>
       </div>
       <p style="font-size: 14px; color: #8a8a8a; margin-top: 40px; border-top: 1px solid #eee; pt: 20px;">
-        This is a private link sent via <a href="${BRAND_URL}" style="color: #4a5d4e; text-decoration: none;">${BRAND_URL.replace('https://', '')}</a>. Please do not share it with others.
+        This is a private link sent via <a href="${getBrandUrl()}" style="color: #4a5d4e; text-decoration: none;">${getBrandUrl().replace('https://', '')}</a>. Please do not share it with others.
       </p>
     </div>
   `;
