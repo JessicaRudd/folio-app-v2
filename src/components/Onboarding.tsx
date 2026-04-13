@@ -48,6 +48,11 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
   const [waitlistEmail, setWaitlistEmail] = useState('');
   const [waitlistStatus, setWaitlistStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   useEffect(() => {
     const checkRedirect = async () => {
       try {
@@ -81,6 +86,12 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
   const checkEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
+    
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
@@ -667,6 +678,12 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
     const handleWaitlistSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!waitlistEmail) return;
+
+      if (!isValidEmail(waitlistEmail)) {
+        setError('Please enter a valid email address');
+        return;
+      }
+
       setWaitlistStatus('loading');
       try {
         const waitlistRef = doc(db, 'waitlist', waitlistEmail.toLowerCase());

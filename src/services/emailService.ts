@@ -9,7 +9,7 @@ function getResend() {
       console.warn('RESEND_API_KEY is not set. Emails will not be sent.');
       return null;
     }
-    console.log(`Initializing Resend client with API key starting with: ${apiKey.substring(0, 7)}...`);
+    console.log(`Initializing Resend client with API key starting with: ${apiKey.substring(0, 7)}... (Length: ${apiKey.length})`);
     resendClient = new Resend(apiKey);
   }
   return resendClient;
@@ -17,7 +17,7 @@ function getResend() {
 
 function getFromEmail() {
   const email = process.env.RESEND_FROM_EMAIL || 'Folio <hello@curateyourfolio.com>';
-  console.log(`Using FROM_EMAIL: ${email}`);
+  console.log(`Using FROM_EMAIL: ${email} (Length: ${email.length})`);
   return email;
 }
 

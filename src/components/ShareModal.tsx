@@ -121,6 +121,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ collection: collectionDa
 
   const createShare = async () => {
     if (!inviteEmail.trim()) return;
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail.trim())) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     try {
       if (inviteType === 'curator') {

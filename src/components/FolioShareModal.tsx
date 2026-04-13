@@ -139,6 +139,13 @@ export const FolioShareModal: React.FC<FolioShareModalProps> = ({ user, onClose 
 
   const createShare = async () => {
     if (!inviteEmail.trim()) return;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail.trim())) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
     setLoading(true);
     try {
       let token = folioMetadata?.shareToken;

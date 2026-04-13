@@ -15,6 +15,11 @@ import firebaseAppletConfig from "./firebase-applet-config.json";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const isValidEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -103,6 +108,7 @@ async function startServer() {
   app.post("/api/waitlist/join", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!isValidEmail(email)) return res.status(400).json({ error: "Invalid email format" });
 
     try {
       console.log("Adding to waitlist:", email, "Project:", adminApp.options.projectId);
@@ -227,6 +233,7 @@ async function startServer() {
     }
 
     if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!isValidEmail(email)) return res.status(400).json({ error: "Invalid email format" });
 
     try {
       const inviteToken = crypto.randomUUID();
@@ -315,6 +322,7 @@ async function startServer() {
   app.post("/api/auth/welcome", async (req, res) => {
     const { email, name } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!isValidEmail(email)) return res.status(400).json({ error: "Invalid email format" });
 
     try {
       console.log(`Sending welcome email to ${email}`);
@@ -336,6 +344,9 @@ async function startServer() {
   app.post("/api/shares/invite", async (req, res) => {
     const { shareId, email, collectionTitle, creatorName, shareUrl } = req.body;
     
+    if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!isValidEmail(email)) return res.status(400).json({ error: "Invalid email format" });
+
     try {
       console.log(`Attempting to send collection invite to ${email} for ${collectionTitle}`);
       const result = await sendInviteEmail({ email, collectionTitle, creatorName, shareUrl });
@@ -357,6 +368,9 @@ async function startServer() {
   app.post("/api/shares/send-otp", async (req, res) => {
     const { shareId, email } = req.body;
     
+    if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!isValidEmail(email)) return res.status(400).json({ error: "Invalid email format" });
+
     try {
       if (!shareId || !email) {
         return res.status(400).json({ error: "Missing shareId or email" });
@@ -450,6 +464,7 @@ async function startServer() {
   app.get("/api/admin/test-email", async (req, res) => {
     const { email } = req.query;
     if (!email || typeof email !== 'string') return res.status(400).json({ error: "Email query parameter is required" });
+    if (!isValidEmail(email)) return res.status(400).json({ error: "Invalid email format" });
 
     try {
       console.log(`Triggering test email (via GET) to ${email}`);
@@ -460,10 +475,18 @@ async function startServer() {
       });
       
       if (result.error) {
-        return res.status(500).json({ error: result.error });
+        return res.status(500).json({ 
+          error: result.error,
+          details: "Check your Resend dashboard. Is the domain verified? Is the API key valid for this domain?"
+        });
       }
       
-      res.json({ success: true, message: "Test email sent successfully", data: result.data });
+      res.json({ 
+        success: true, 
+        message: "Resend accepted the email request.", 
+        resendId: result.data?.id,
+        data: result.data 
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -472,6 +495,7 @@ async function startServer() {
   app.post("/api/admin/test-email", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!isValidEmail(email)) return res.status(400).json({ error: "Invalid email format" });
 
     try {
       console.log(`Triggering test email to ${email}`);
@@ -483,11 +507,19 @@ async function startServer() {
       
       if (result.error) {
         console.error("Test email failed:", result.error);
-        return res.status(500).json({ error: result.error });
+        return res.status(500).json({ 
+          error: result.error, 
+          details: "Check your Resend dashboard. Is the domain verified? Is the API key valid for this domain?" 
+        });
       }
       
       console.log("Test email sent successfully:", result.data);
-      res.json({ success: true, data: result.data });
+      res.json({ 
+        success: true, 
+        message: "Resend accepted the email request.", 
+        resendId: result.data?.id,
+        data: result.data 
+      });
     } catch (error: any) {
       console.error("Error in test-email endpoint:", error);
       res.status(500).json({ error: error.message });
