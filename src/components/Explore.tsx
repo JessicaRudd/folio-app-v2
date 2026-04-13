@@ -61,16 +61,16 @@ export const Explore = () => {
       try {
         // 1. Fetch Public Collections
         try {
+          console.log('Fetching public collections...');
           const collectionsRef = collection(db, 'collections');
           const collectionsQuery = query(
             collectionsRef,
             where('privacy', '==', 'public'),
-            where('visibility', '==', 'public'),
-            where('profilePrivacy', '==', 'public'),
             limit(20)
           );
           
           const collectionsSnapshot = await getDocs(collectionsQuery);
+          console.log(`Fetched ${collectionsSnapshot.docs.length} public collections`);
           const collections = collectionsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
@@ -79,45 +79,58 @@ export const Explore = () => {
           }));
 
           setPublicCollections(collections);
-        } catch (err) {
+        } catch (err: any) {
           console.error('Error fetching public collections:', err);
+          console.error('Error details:', {
+            message: err.message,
+            code: err.code,
+            stack: err.stack
+          });
           // Don't throw, just continue
         }
 
         // 2. Fetch Public Curators
         try {
+          console.log('Fetching public curators...');
           const curatorsRef = collection(db, 'public_profiles');
           const curatorsQuery = query(
             curatorsRef,
             limit(10)
           );
           const curatorsSnapshot = await getDocs(curatorsQuery);
+          console.log(`Fetched ${curatorsSnapshot.docs.length} public curators`);
           const curators = curatorsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
           setPublicCurators(curators);
-        } catch (err) {
+        } catch (err: any) {
           console.error('Error fetching public curators:', err);
         }
 
         // 3. Fetch Public Postcards (for everyone)
         try {
+          console.log('Fetching public postcards...');
           const publicPostcardsQuery = query(
             collection(db, 'postcards'),
-            where('collectionVisibility', '==', 'public'),
-            where('profilePrivacy', '==', 'public'),
+            where('collectionPrivacy', '==', 'public'),
             limit(20)
           );
           const publicPostcardsSnap = await getDocs(publicPostcardsQuery);
+          console.log(`Fetched ${publicPostcardsSnap.docs.length} public postcards`);
           const publicPostcards = publicPostcardsSnap.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
             date: doc.data().postcardDate || doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
           }));
           setPublicPostcards(publicPostcards);
-        } catch (err) {
+        } catch (err: any) {
           console.error('Error fetching public postcards:', err);
+          console.error('Error details:', {
+            message: err.message,
+            code: err.code,
+            stack: err.stack
+          });
         }
 
         // 4. Fetch Personalized Feed if logged in
@@ -137,8 +150,7 @@ export const Explore = () => {
                 const q = query(
                   collection(db, 'postcards'),
                   where('creatorId', 'in', chunk),
-                  where('collectionVisibility', '==', 'public'),
-                  where('profilePrivacy', '==', 'public'),
+                  where('collectionPrivacy', '==', 'public'),
                   limit(10)
                 );
                 try {
@@ -239,6 +251,7 @@ export const Explore = () => {
     <div className="min-h-screen bg-canvas pb-24">
       <Navbar 
         user={user} 
+        userProfile={userProfile}
         onLogin={() => setIsOnboarding(true)} 
         onLogout={handleLogout} 
         onCreate={handleCreate} 

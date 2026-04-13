@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -26,7 +26,7 @@ import {
   signInWithPopup,
   fetchSignInMethodsForEmail
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 interface OnboardingProps {
   onClose: () => void;
@@ -34,7 +34,7 @@ interface OnboardingProps {
   initialStep?: Step;
 }
 
-type Step = 'welcome' | 'concepts' | 'privacy' | 'auth-email' | 'auth-password' | 'auth-signup' | 'forgot-password';
+type Step = 'welcome' | 'concepts' | 'privacy' | 'auth-email' | 'auth-password' | 'auth-signup' | 'forgot-password' | 'waitlist-info' | 'waitlist-join';
 
 export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps) => {
   const [step, setStep] = useState<Step>(initialStep || 'welcome');
@@ -43,8 +43,26 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<React.ReactNode | null>(null);
   const [resetSent, setResetSent] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistStatus, setWaitlistStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        const { getRedirectResult } = await import('firebase/auth');
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          onSuccess();
+        }
+      } catch (err: any) {
+        console.error("Redirect result error:", err);
+        setError(err.message);
+      }
+    };
+    checkRedirect();
+  }, []);
 
   const handleNext = () => {
     if (step === 'welcome') setStep('concepts');
@@ -101,12 +119,25 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
     }
   };
 
+  const checkAccess = async () => {
+    try {
+      const response = await fetch('/api/auth/check-access');
+      const data = await response.json();
+      return data.accessGranted;
+    } catch (err) {
+      return false;
+    }
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // If sign in is successful, we let them in. 
+      // Gatekeeper will handle the access check.
       onSuccess();
     } catch (err: any) {
       setError(err.message);
@@ -117,6 +148,7 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (!username || !displayName) {
       setError('Please fill in all fields');
       return;
@@ -149,6 +181,8 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
         handleFirestoreError(err, OperationType.WRITE, userPath);
       }
 
+      // If sign up is successful, we let them in.
+      // Gatekeeper will handle the access check.
       onSuccess();
     } catch (err: any) {
       setError(err.message);
@@ -158,6 +192,7 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
   };
 
   const handleForgotPassword = async () => {
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
@@ -171,6 +206,9 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
   };
 
   const handleGoogleLogin = async () => {
+    if (loading) return;
+    setLoading(true);
+    setError(null);
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
@@ -199,9 +237,57 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
           handleFirestoreError(err, OperationType.WRITE, userPath);
         }
       }
+      
+      // If login is successful, we let them in.
+      // Gatekeeper will handle the access check.
       onSuccess();
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === 'auth/popup-blocked') {
+        setError('The login popup was blocked by your browser. Please enable popups for this site and try again.');
+      } else if (err.code === 'auth/cancelled-popup-request' || err.code === 'auth/popup-closed-by-user') {
+        // Ignore these errors as they mean the user cancelled or a previous request was superseded
+        console.log('Popup request cancelled or closed by user');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError(`This domain is not authorized for login. Please add "${window.location.hostname}" to your Firebase authorized domains.`);
+      } else {
+        setError(
+          <div className="space-y-4">
+            <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm space-y-2">
+              <p className="font-bold">Login Issue Detected</p>
+              <p>{err.message}</p>
+            </div>
+            
+            <div className="space-y-3">
+              <p className="text-xs text-charcoal/40 text-center">
+                Authentication in previews can sometimes be blocked by browser security or <strong>third-party cookie restrictions</strong>.
+              </p>
+              
+              <Button 
+                variant="primary"
+                className="w-full py-4"
+                onClick={() => {
+                  const provider = new GoogleAuthProvider();
+                  import('firebase/auth').then(({ signInWithRedirect }) => {
+                    signInWithRedirect(auth, provider);
+                  });
+                }}
+              >
+                Try Redirect Login
+              </Button>
+
+              <Button 
+                variant="outline"
+                className="w-full py-4"
+                onClick={() => window.open(window.location.href, '_blank')}
+              >
+                Open in New Tab
+              </Button>
+            </div>
+          </div>
+        );
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -218,18 +304,17 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
           "A curated collection of digital postcards. Private memories, shared with intention."
         </p>
       </div>
-      <Button variant="primary" onClick={handleNext} className="w-full py-6 text-lg group">
-        Begin Your Journey <ChevronRight className="ml-2 group-hover:translate-x-1 transition-transform" />
-      </Button>
-      <div className="text-center">
-        <button 
-          type="button" 
-          onClick={() => setStep('auth-email')}
-          className="text-xs text-charcoal/40 hover:text-sage font-bold uppercase tracking-widest transition-colors"
-        >
-          Already a creator? Sign In
-        </button>
+      <div className="space-y-4">
+        <Button variant="primary" onClick={() => setStep('waitlist-join')} className="w-full py-6 text-lg group">
+          Join the Waitlist <ChevronRight className="ml-2 group-hover:translate-x-1 transition-transform" />
+        </Button>
+        <Button variant="outline" onClick={() => setStep('auth-email')} className="w-full py-6 text-lg">
+          Sign In
+        </Button>
       </div>
+      <p className="text-[10px] text-charcoal/30 uppercase tracking-[0.2em] font-bold">
+        Folio is currently in private beta
+      </p>
     </div>
   );
 
@@ -371,6 +456,12 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
           <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
           Continue with Google
         </Button>
+
+        <div className="text-center">
+          <p className="text-[10px] text-charcoal/30 uppercase tracking-widest font-bold">
+            Tip: If login fails, try <button type="button" onClick={() => window.open(window.location.href, '_blank')} className="text-sage underline">opening in a new tab</button>
+          </p>
+        </div>
       </form>
     </div>
   );
@@ -549,6 +640,111 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
     </div>
   );
 
+  const renderWaitlistJoin = () => {
+    const handleWaitlistSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!waitlistEmail) return;
+      setWaitlistStatus('loading');
+      try {
+        const waitlistRef = doc(db, 'waitlist', waitlistEmail.toLowerCase());
+        
+        try {
+          await setDoc(waitlistRef, {
+            email: waitlistEmail.toLowerCase(),
+            status: 'pending',
+            createdAt: serverTimestamp()
+          });
+          setWaitlistStatus('success');
+          setEmail(waitlistEmail);
+        } catch (err: any) {
+          // If it fails with permission denied, it might be because it already exists
+          // (since guests can create but not update/read)
+          if (err.code === 'permission-denied') {
+            setWaitlistStatus('success');
+            setEmail(waitlistEmail);
+          } else {
+            throw err;
+          }
+        }
+      } catch (err: any) {
+        setWaitlistStatus('error');
+        setError(err.message || 'Failed to join waitlist');
+      }
+    };
+
+    if (waitlistStatus === 'success') {
+      return (
+        <div className="space-y-8 py-12 text-center">
+          <div className="w-20 h-20 bg-sage/10 rounded-full flex items-center justify-center mx-auto text-sage">
+            <CheckCircle2 size={40} />
+          </div>
+          <div className="space-y-4">
+            <h3 className="text-3xl font-serif">You're on the list</h3>
+            <p className="text-charcoal/60 leading-relaxed max-w-sm mx-auto">
+              We've added you to our private beta waitlist. Keep an eye on your inbox for a digital invitation.
+            </p>
+          </div>
+          <div className="pt-6">
+            <Button variant="primary" onClick={onClose} className="w-full py-6">
+              Got it
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8 py-8">
+        <div className="space-y-2 text-center">
+          <h3 className="text-3xl font-serif">Join the Waitlist</h3>
+          <p className="text-charcoal/40 uppercase tracking-widest text-xs font-bold">Request Early Access</p>
+        </div>
+
+        <form onSubmit={handleWaitlistSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40 ml-4">Email Address</label>
+            <input
+              type="email"
+              required
+              value={waitlistEmail}
+              onChange={(e) => setWaitlistEmail(e.target.value)}
+              placeholder="curator@example.com"
+              className="w-full bg-charcoal/[0.02] border border-charcoal/5 rounded-2xl px-6 py-4 outline-none focus:border-sage focus:ring-4 focus:ring-sage/5 transition-all"
+            />
+          </div>
+
+          <Button variant="primary" type="submit" disabled={waitlistStatus === 'loading'} className="w-full py-6">
+            {waitlistStatus === 'loading' ? <Loader2 className="animate-spin" /> : 'Request Invitation'}
+          </Button>
+          
+          <Button variant="ghost" onClick={() => setStep('welcome')} className="w-full">Back</Button>
+        </form>
+      </div>
+    );
+  };
+
+  const renderWaitlistInfo = () => (
+    <div className="space-y-8 py-12 text-center">
+      <div className="w-20 h-20 bg-sage/10 rounded-full flex items-center justify-center mx-auto text-sage">
+        <Mail size={40} />
+      </div>
+      <div className="space-y-4">
+        <h3 className="text-3xl font-serif">You're on the list</h3>
+        <p className="text-charcoal/60 leading-relaxed max-w-sm mx-auto">
+          Folio is currently in private beta. We've saved your account, but you'll need a digital invitation to access the dashboard.
+        </p>
+      </div>
+      <div className="pt-6">
+        <Button variant="primary" onClick={onClose} className="w-full py-6">
+          Got it
+        </Button>
+      </div>
+      <p className="text-[10px] text-charcoal/30 uppercase tracking-[0.2em] font-bold">
+        We'll notify you at {email}
+      </p>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div
@@ -588,6 +784,8 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
               {step === 'auth-password' && renderAuthPassword()}
               {step === 'auth-signup' && renderAuthSignup()}
               {step === 'forgot-password' && renderForgotPassword()}
+              {step === 'waitlist-info' && renderWaitlistInfo()}
+              {step === 'waitlist-join' && renderWaitlistJoin()}
             </motion.div>
           </AnimatePresence>
         </div>

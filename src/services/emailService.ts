@@ -8,12 +8,16 @@ export async function sendInviteEmail({
   email, 
   collectionTitle, 
   shareUrl, 
-  creatorName 
+  creatorName,
+  inviteToken,
+  type = 'collection'
 }: { 
   email: string; 
-  collectionTitle: string; 
-  shareUrl: string; 
-  creatorName: string;
+  collectionTitle?: string; 
+  shareUrl?: string; 
+  creatorName?: string;
+  inviteToken?: string;
+  type?: 'collection' | 'early-access';
 }) {
   if (!resend) {
     const msg = 'RESEND_API_KEY not set. Skipping email send.';
@@ -21,27 +25,62 @@ export async function sendInviteEmail({
     return { error: msg };
   }
 
+  const isEarlyAccess = type === 'early-access';
+  const subject = isEarlyAccess 
+    ? "Your invitation to Folio has arrived. 🕊️"
+    : `Invite: View ${collectionTitle} on Folio`;
+
+  const unlockUrl = `${BRAND_URL}/unlock?token=${inviteToken}`;
+
+  const html = isEarlyAccess ? `
+    <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto; padding: 60px 40px; background: #fdfcfb; color: #1a1a1a; border: 1px solid #eee; border-radius: 4px;">
+      <div style="text-align: center; margin-bottom: 40px;">
+        <div style="display: inline-block; width: 40px; height: 40px; background: #1a1a1a; transform: rotate(45deg); margin-bottom: 20px;">
+          <span style="display: block; transform: rotate(-45deg); color: white; font-weight: bold; font-size: 24px; line-height: 40px;">F</span>
+        </div>
+      </div>
+      
+      <h1 style="font-size: 28px; font-weight: normal; text-align: center; margin-bottom: 32px; letter-spacing: -0.02em;">Digital Invitation</h1>
+      
+      <p style="font-size: 18px; line-height: 1.8; margin-bottom: 40px; text-align: center; color: #444;">
+        You’ve been invited to join the Folio inner circle. Click below to unlock your private dashboard and start curating your memories.
+      </p>
+      
+      <div style="text-align: center; margin: 60px 0;">
+        <a href="${unlockUrl}" style="display: inline-block; border: 2px solid #1a1a1a; padding: 20px 40px; text-decoration: none; color: #1a1a1a; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; font-size: 12px; transition: all 0.3s ease;">
+          Unlock Access
+        </a>
+      </div>
+      
+      <div style="margin-top: 60px; padding-top: 30px; border-top: 1px solid #eee; text-align: center;">
+        <p style="font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.1em;">
+          Folio &copy; 2026 &mdash; Private Beta
+        </p>
+      </div>
+    </div>
+  ` : `
+    <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 40px; background: #fdfcfb; color: #1a1a1a;">
+      <h1 style="font-size: 32px; margin-bottom: 24px;">You've been invited</h1>
+      <p style="font-size: 18px; line-height: 1.6; font-style: italic; color: #4a4a4a;">
+        ${creatorName} has invited you to view their private collection: <strong>${collectionTitle}</strong>.
+      </p>
+      <div style="margin: 40px 0;">
+        <a href="${shareUrl}" style="background: #4a5d4e; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-family: sans-serif; display: inline-block;">
+          View Collection
+        </a>
+      </div>
+      <p style="font-size: 14px; color: #8a8a8a; margin-top: 40px; border-top: 1px solid #eee; pt: 20px;">
+        This is a private link sent via <a href="${BRAND_URL}" style="color: #4a5d4e; text-decoration: none;">${BRAND_URL.replace('https://', '')}</a>. Please do not share it with others.
+      </p>
+    </div>
+  `;
+
   try {
     const { data, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: email,
-      subject: `Invite: View ${collectionTitle} on Folio`,
-      html: `
-        <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 40px; background: #fdfcfb; color: #1a1a1a;">
-          <h1 style="font-size: 32px; margin-bottom: 24px;">You've been invited</h1>
-          <p style="font-size: 18px; line-height: 1.6; font-style: italic; color: #4a4a4a;">
-            ${creatorName} has invited you to view their private collection: <strong>${collectionTitle}</strong>.
-          </p>
-          <div style="margin: 40px 0;">
-            <a href="${shareUrl}" style="background: #4a5d4e; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-family: sans-serif; display: inline-block;">
-              View Collection
-            </a>
-          </div>
-          <p style="font-size: 14px; color: #8a8a8a; margin-top: 40px; border-top: 1px solid #eee; pt: 20px;">
-            This is a private link sent via <a href="${BRAND_URL}" style="color: #4a5d4e; text-decoration: none;">${BRAND_URL.replace('https://', '')}</a>. Please do not share it with others.
-          </p>
-        </div>
-      `
+      subject,
+      html
     });
 
     if (error) {

@@ -31,6 +31,8 @@ interface PostcardProps {
   mediaUrls: string[];
   caption: string;
   location?: string;
+  lat?: number;
+  lng?: number;
   date: string;
   isPremium?: boolean;
   musicVibe?: MusicVibe | null;
@@ -47,6 +49,8 @@ export const Postcard = ({
   mediaUrls, 
   caption, 
   location, 
+  lat,
+  lng,
   date, 
   musicVibe, 
   isPremium = false,
@@ -282,9 +286,11 @@ export const Postcard = ({
         <div className="flex justify-between items-start">
           <div className="space-y-1">
             {location && (
-              <div className="flex items-center gap-1 text-sage text-sm font-medium">
-                <MapPin size={14} />
-                {location}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 text-sage text-sm font-medium">
+                  <MapPin size={14} />
+                  {location}
+                </div>
               </div>
             )}
             <div className="text-charcoal/40 text-xs uppercase tracking-widest font-bold">

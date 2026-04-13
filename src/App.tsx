@@ -20,9 +20,11 @@ import { AlertRibbon } from './components/AlertRibbon';
 import { Footer } from './components/Footer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FeedbackModal } from './components/FeedbackModal';
+import { WaitingRoom } from './components/WaitingRoom';
+import { AdminOnboarding } from './components/AdminOnboarding';
 import { Button } from './components/ui/Button';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Plus, Share2, Settings } from 'lucide-react';
+import { ArrowLeft, Plus, Share2, Settings, Loader2 } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
 import { APP_LIMITS } from './constants';
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from 'firebase/auth';
@@ -40,6 +42,59 @@ const MOCK_FOLIOS = [
   },
 ];
 
+function Gatekeeper({ children }: { children: React.ReactNode }) {
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isLoginOverride, setIsLoginOverride] = useState(() => {
+    return new URLSearchParams(window.location.search).get('login') === 'true';
+  });
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setIsAuthReady(true);
+      if (u) setIsLoginOverride(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const response = await fetch('/api/auth/check-access');
+        const data = await response.json();
+        setHasAccess(data.accessGranted);
+      } catch (err) {
+        setHasAccess(false);
+      }
+    };
+    checkAccess();
+
+    // Safety timeout for access check
+    const timeout = setTimeout(() => {
+      setHasAccess(prev => prev === null ? false : prev);
+    }, 3000);
+    
+    return () => clearTimeout(timeout);
+  }, []);
+
+  if ((hasAccess === null || !isAuthReady) && !isLoginOverride) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fdfcfb]">
+        <Loader2 className="animate-spin text-sage" size={32} />
+      </div>
+    );
+  }
+
+  // Grant access if cookie is present OR user is logged in OR we are trying to login
+  if (hasAccess || user || isLoginOverride) {
+    return <>{children}</>;
+  }
+
+  return <WaitingRoom />;
+}
+
 function CreatorDashboard() {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -53,11 +108,22 @@ function CreatorDashboard() {
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [limitReachedType, setLimitReachedType] = useState<'folios' | 'postcards' | 'photos' | null>(null);
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
-  const [onboardingStep, setOnboardingStep] = useState<'welcome' | 'auth-email'>('welcome');
+  const [onboardingStep, setOnboardingStep] = useState<any>('welcome');
   const [realPostcards, setRealPostcards] = useState<any[]>([]);
   const [realCollections, setRealCollections] = useState<any[]>([]);
   const [looseStats, setLooseStats] = useState({ postcards: 0, photos: 0 });
   const [dismissedAlert, setDismissedAlert] = useState<string | null>(null);
+
+  // Handle auto-login from query param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('login') === 'true') {
+      setOnboardingStep('auth-email');
+      setIsOnboarding(true);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   // Fetch User Profile and Stats
   useEffect(() => {
@@ -276,6 +342,7 @@ function CreatorDashboard() {
     <div className="min-h-screen flex flex-col">
       <Navbar 
         user={user} 
+        userProfile={userProfile}
         onLogin={(step = 'auth-email') => {
           setOnboardingStep(step);
           setIsOnboarding(true);
@@ -518,11 +585,12 @@ export default function App() {
     <ErrorBoundary>
       <Router>
         <Routes>
-          <Route path="/" element={<CreatorDashboard />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/" element={<Gatekeeper><CreatorDashboard /></Gatekeeper>} />
+          <Route path="/admin/onboarding" element={<AdminOnboarding />} />
+          <Route path="/profile" element={<Gatekeeper><ProfilePage /></Gatekeeper>} />
           <Route path="/u/:username" element={<PublicProfile />} />
           <Route path="/explore" element={<Explore />} />
-          <Route path="/map" element={<MapView />} />
+          <Route path="/map" element={<Gatekeeper><MapView /></Gatekeeper>} />
           <Route path="/v/:collectionId" element={<GuestView />} />
           <Route path="/v/:collectionId/:secureToken" element={<GuestView />} />
           <Route path="/s/:collectionId" element={<PublicCollectionView />} />

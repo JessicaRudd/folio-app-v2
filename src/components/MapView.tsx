@@ -113,6 +113,10 @@ export const MapView = () => {
     fetchLocations();
   }, []);
 
+  const initialLat = 20;
+  const initialLng = 0;
+  const initialZoom = 3;
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-canvas space-y-4">
@@ -155,8 +159,8 @@ export const MapView = () => {
       {/* Map */}
       <div className="flex-1 relative">
         <MapContainer 
-          center={[20, 0]} 
-          zoom={3} 
+          center={[initialLat, initialLng]} 
+          zoom={initialZoom} 
           className="h-full w-full"
           scrollWheelZoom={true}
         >

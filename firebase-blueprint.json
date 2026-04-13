@@ -205,15 +205,16 @@
     },
     "Waitlist": {
       "title": "Waitlist",
-      "description": "Users waiting for premium features",
+      "description": "Users waiting for early access to Folio",
       "type": "object",
       "properties": {
         "email": { "type": "string", "format": "email" },
-        "userId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved"] },
+        "inviteToken": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "source": { "type": "string" }
+        "approvedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["email", "createdAt"]
+      "required": ["email", "status", "createdAt"]
     }
   },
   "firestore": {

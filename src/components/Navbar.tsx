@@ -14,7 +14,8 @@ import {
   Settings, 
   MessageSquare,
   ChevronDown,
-  Info
+  Info,
+  Shield
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -26,6 +27,7 @@ import { cn } from '../lib/utils';
 
 interface NavbarProps {
   user: any;
+  userProfile?: any;
   onLogin: (initialStep?: 'welcome' | 'auth-email') => void;
   onLogout: () => void;
   onCreate: () => void;
@@ -33,7 +35,7 @@ interface NavbarProps {
   onLogoClick?: () => void;
 }
 
-export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback, onLogoClick }: NavbarProps) => {
+export const Navbar = ({ user, userProfile, onLogin, onLogout, onCreate, onFeedback, onLogoClick }: NavbarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -77,6 +79,7 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback, onLogoCl
     { name: 'Collections', path: '/', icon: <User size={16} />, curatorOnly: true },
     { name: 'Explore', path: '/explore', icon: <Globe size={16} /> },
     { name: 'Memory Map', path: '/map', icon: <MapPin size={16} />, curatorOnly: true },
+    { name: 'Admin', path: '/admin/onboarding', icon: <Shield size={16} />, adminOnly: true },
   ];
 
   const secondaryLinks = [
@@ -88,11 +91,15 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback, onLogoCl
 
   const profileLinks = [
     { name: 'Settings', path: '/profile', icon: <Settings size={16} /> },
+    { name: 'Admin Dashboard', path: '/admin/onboarding', icon: <Shield size={16} />, adminOnly: true },
     { name: 'Feedback', onClick: onFeedback, icon: <MessageSquare size={16} /> },
   ];
 
+  const isAdmin = userProfile?.role === 'admin' || (user?.email === 'jess@irudd.com' && user?.emailVerified);
+
   const filteredLinks = navLinks.filter(link => {
     if (link.curatorOnly && !user) return false;
+    if (link.adminOnly && !isAdmin) return false;
     return true;
   });
 
@@ -110,6 +117,11 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback, onLogoCl
   const desktopSecondary = filteredSecondary.filter(link => {
     // On desktop (lg), we hide "Create" from the secondary list because it's a main button
     return !link.tabletOnly;
+  });
+
+  const filteredProfileLinks = profileLinks.filter(link => {
+    if (link.adminOnly && !isAdmin) return false;
+    return true;
   });
 
   const isActive = (path: string) => location.pathname === path;
@@ -288,11 +300,16 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback, onLogoCl
                       className="absolute top-full right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-charcoal/5 p-2 overflow-hidden"
                     >
                       <div className="px-4 py-3 border-b border-charcoal/5 mb-2">
-                        <p className="text-xs font-bold truncate">{user.displayName || 'Curator'}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold truncate">{user.displayName || 'Curator'}</p>
+                          {isAdmin && (
+                            <span className="text-[8px] bg-sage/10 text-sage px-1.5 py-0.5 rounded-full font-bold uppercase tracking-widest">Admin</span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-charcoal/40 truncate">{user.email}</p>
                       </div>
 
-                      {profileLinks.map((link) => (
+                      {filteredProfileLinks.map((link) => (
                         link.path ? (
                           <Link
                             key={link.name}
@@ -452,7 +469,12 @@ export const Navbar = ({ user, onLogin, onLogout, onCreate, onFeedback, onLogoCl
                       )}
                     </div>
                     <div>
-                      <p className="font-serif text-lg">{user.displayName}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-serif text-lg">{user.displayName}</p>
+                        {isAdmin && (
+                          <span className="text-[8px] bg-sage/10 text-sage px-1.5 py-0.5 rounded-full font-bold uppercase tracking-widest">Admin</span>
+                        )}
+                      </div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-charcoal/30">Curator</p>
                     </div>
                   </div>

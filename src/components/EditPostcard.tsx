@@ -380,6 +380,59 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
           {/* Form */}
           <div className="space-y-6">
             <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40 flex items-center gap-2">
+                  <MapPin size={14} /> Location
+                </label>
+                <button 
+                  onClick={getCurrentLocation}
+                  disabled={isLocating}
+                  className="text-[10px] text-sage font-bold uppercase tracking-widest flex items-center gap-1 hover:underline disabled:opacity-50"
+                >
+                  {isLocating ? <Loader2 className="animate-spin" size={10} /> : <Navigation size={10} />}
+                  Current
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => handleLocationChange(e.target.value)}
+                  onFocus={() => locationSuggestions.length > 0 && setShowSuggestions(true)}
+                  placeholder="Where was this?"
+                  className="w-full p-3 bg-white rounded-lg border border-charcoal/5 focus:ring-2 focus:ring-sage/20 focus:border-sage outline-none transition-all"
+                />
+                {isSearchingLocation && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="animate-spin text-sage" size={16} />
+                  </div>
+                )}
+                
+                <AnimatePresence>
+                  {showSuggestions && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-lg border border-charcoal/5 shadow-xl overflow-hidden"
+                    >
+                      {locationSuggestions.map((suggestion, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => selectLocation(suggestion)}
+                          className="w-full text-left px-4 py-3 hover:bg-canvas transition-colors text-sm border-b border-charcoal/5 last:border-0 flex items-start gap-3"
+                        >
+                          <MapPin size={14} className="text-sage mt-0.5 shrink-0" />
+                          <span className="truncate">{suggestion.display_name}</span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-widest text-charcoal/40">Diary Entry</label>
               <textarea
                 value={caption}

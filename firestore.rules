@@ -16,9 +16,9 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') || 
-         (request.auth.token.email == "jess@irudd.com" && request.auth.token.email_verified == true));
+        (request.auth.token.email == "jess@irudd.com" || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
     
     function isCurator(data) {
@@ -72,9 +72,6 @@ service cloud.firestore {
     // Collections
     match /collections/{collectionId} {
       allow read: if isAdmin() ||
-                     (resource.data.privacy == 'public' && 
-                      resource.data.visibility == 'public' && 
-                      resource.data.profilePrivacy == 'public') ||
                      resource.data.privacy == 'public' || 
                      resource.data.visibility == 'public' ||
                      isCurator(resource.data) ||
@@ -89,8 +86,7 @@ service cloud.firestore {
     // Postcards
     match /postcards/{postcardId} {
       allow read: if isAdmin() ||
-                     (resource.data.collectionVisibility == 'public' && 
-                      resource.data.profilePrivacy == 'public') ||
+                     resource.data.collectionPrivacy == 'public' ||
                      resource.data.collectionVisibility == 'public' ||
                      resource.data.creatorId == request.auth.uid ||
                      isCuratorOfCollection(resource.data.collectionId) ||
@@ -153,8 +149,10 @@ service cloud.firestore {
 
     // Waitlist
     match /waitlist/{email} {
+      // Allow anyone to join or re-join (update to pending)
       allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow update: if isAdmin() || (request.resource.data.status == 'pending');
+      allow read, delete: if isAdmin();
     }
   }
 }

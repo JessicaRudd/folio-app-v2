@@ -20,26 +20,25 @@ const getEnv = (key: string) => {
 };
 
 const firebaseConfig = {
-  apiKey: getEnv('VITE_FIREBASE_API_KEY') || firebaseAppletConfig.apiKey,
-  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN') || firebaseAppletConfig.authDomain,
-  projectId: getEnv('VITE_FIREBASE_PROJECT_ID') || firebaseAppletConfig.projectId,
-  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET') || firebaseAppletConfig.storageBucket,
-  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID') || firebaseAppletConfig.messagingSenderId,
-  appId: getEnv('VITE_FIREBASE_APP_ID') || firebaseAppletConfig.appId,
-  measurementId: getEnv('VITE_FIREBASE_MEASUREMENT_ID') || firebaseAppletConfig.measurementId
+  apiKey: firebaseAppletConfig.apiKey,
+  authDomain: firebaseAppletConfig.authDomain,
+  projectId: firebaseAppletConfig.projectId,
+  storageBucket: firebaseAppletConfig.storageBucket,
+  messagingSenderId: firebaseAppletConfig.messagingSenderId,
+  appId: firebaseAppletConfig.appId,
+  measurementId: firebaseAppletConfig.measurementId
 };
 
-console.log("Firebase Config at Runtime:", {
+console.log("Firebase Config at Runtime (Forced from config):", {
   projectId: firebaseConfig.projectId,
-  databaseId: firebaseAppletConfig.firestoreDatabaseId,
-  authDomain: firebaseConfig.authDomain
+  databaseId: firebaseAppletConfig.firestoreDatabaseId
 });
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-const databaseId = firebaseAppletConfig.firestoreDatabaseId === '(default)' ? undefined : firebaseAppletConfig.firestoreDatabaseId;
+const databaseId = undefined; // Force (default) database
 export const db = getFirestore(app, databaseId);
-console.log("Firestore Instance Initialized with DB ID:", databaseId || "(default)");
+console.log("Firestore Instance Initialized with DB ID: (default) [FORCED]");
 export const storage = getStorage(app);
 
 async function testConnection() {

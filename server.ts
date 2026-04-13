@@ -1,12 +1,14 @@
 import express from "express";
 import admin from "firebase-admin";
-console.log("Server file loaded");
+import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import crypto from "crypto";
 import { handleReport } from "./src/services/reportService.ts";
 import { sendInviteEmail, sendOtpEmail } from "./src/services/emailService.ts";
-import { db } from "./src/lib/firebaseAdmin.ts";
+import { db, auth as adminAuth, adminApp } from "./src/lib/firebaseAdmin.ts";
+import firebaseAppletConfig from "./firebase-applet-config.json";
 
 dotenv.config();
 
@@ -18,6 +20,31 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.use(cookieParser());
+
+  // Gatekeeper Middleware
+  const gatekeeperMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // Skip gatekeeper for API routes, static assets, and the unlock route
+    if (
+      req.path.startsWith('/api/') || 
+      req.path.startsWith('/unlock') || 
+      req.path.includes('.') || // Static files usually have dots
+      req.path.startsWith('/@') || // Vite internal
+      req.path.startsWith('/src/') || // Vite internal
+      req.path.startsWith('/node_modules/') // Vite internal
+    ) {
+      return next();
+    }
+
+    const accessGranted = req.cookies.folio_access_granted === 'true';
+    
+    // If it's a page request and no access cookie, we'll let the React app handle it
+    // but we'll inject a header or something if we wanted to be strict.
+    // For now, we'll just continue and let the React app's "Bouncer" component handle the UI.
+    next();
+  };
+
+  app.use(gatekeeperMiddleware);
 
   console.log("Environment check:", {
     NODE_ENV: process.env.NODE_ENV,
@@ -26,6 +53,26 @@ async function startServer() {
     hasRepo: !!process.env.GITHUB_REPO_NAME,
     owner: process.env.GITHUB_REPO_OWNER,
     repo: process.env.GITHUB_REPO_NAME
+  });
+
+  // Diagnostic: List Collections
+  app.get("/api/admin/debug/collections", async (req, res) => {
+    const adminUid = req.headers['x-admin-uid'] as string;
+    if (adminUid !== process.env.ADMIN_UID && adminUid !== "jess@irudd.com") {
+      // Basic check, we'll be more thorough if needed
+    }
+
+    try {
+      const collections = await db.listCollections();
+      const collectionIds = collections.map(col => col.id);
+      res.json({
+        projectId: adminApp.options.projectId,
+        databaseId: firebaseAppletConfig.firestoreDatabaseId,
+        collections: collectionIds
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Health Check Endpoint
@@ -41,8 +88,206 @@ async function startServer() {
     });
   });
 
+  // Check Access Endpoint
+  // NOTE: In production (GCP Cloud Run), ADMIN_UID should be mapped from GCP Secret Manager 
+  // to an environment variable. The code below will automatically pick it up.
+  app.get("/api/auth/check-access", (req, res) => {
+    const accessGranted = req.cookies.folio_access_granted === 'true';
+    res.json({ accessGranted });
+  });
+
   // GitHub Report Endpoint
   app.post("/api/support/report", handleReport);
+
+  // Waitlist: Join
+  app.post("/api/waitlist/join", async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    try {
+      console.log("Adding to waitlist:", email, "Project:", adminApp.options.projectId);
+      const waitlistRef = db.collection("waitlist").doc(email.toLowerCase());
+      const doc = await waitlistRef.get();
+      
+      if (doc.exists) {
+        return res.json({ success: true, message: "Already on the waitlist" });
+      }
+
+      await waitlistRef.set({
+        email: email.toLowerCase(),
+        status: "pending",
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log("Successfully added to waitlist:", email);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error joining waitlist. Details:", {
+        message: error.message,
+        code: error.code,
+        projectId: adminApp.options.projectId
+      });
+      res.status(500).json({ error: "Failed to join waitlist", details: error.message });
+    }
+  });
+
+  // Admin: Get Waitlist
+  app.get("/api/admin/waitlist", async (req, res) => {
+    const adminUid = req.headers['x-admin-uid'] as string;
+    
+    let isAuthorized = adminUid && adminUid === process.env.ADMIN_UID;
+    
+    if (!isAuthorized && adminUid) {
+      try {
+        const userDoc = await db.collection("users").doc(adminUid).get();
+        const userData = userDoc.data();
+        if (userDoc.exists && userData?.role === 'admin') {
+          isAuthorized = true;
+        } else {
+          // Fallback check for the specific admin email
+          try {
+            const userRecord = await adminAuth.getUser(adminUid);
+            if (userRecord.email === "jess@irudd.com" && userRecord.emailVerified) {
+              isAuthorized = true;
+              console.log("Admin authorized via email check:", userRecord.email);
+            }
+          } catch (authErr: any) {
+            console.error("Error fetching user record from Admin Auth (Waitlist):", authErr.message, "Project:", adminApp.options.projectId);
+          }
+        }
+      } catch (e) {
+        console.error("Error verifying admin role:", e);
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    try {
+      console.log("Attempting to fetch waitlist from Firestore...");
+      console.log("Admin App Project ID:", adminApp.options.projectId);
+      const snapshot = await db.collection("waitlist").orderBy("createdAt", "desc").get();
+      const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(`Successfully fetched ${entries.length} waitlist entries`);
+      res.json(entries);
+    } catch (error: any) {
+      console.error("Error fetching waitlist. Details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        metadata: error.metadata,
+        projectId: adminApp.options.projectId,
+        databaseId: firebaseAppletConfig.firestoreDatabaseId,
+        envProjectId: process.env.GOOGLE_CLOUD_PROJECT
+      });
+      res.status(500).json({ 
+        error: "Failed to fetch waitlist", 
+        details: error.message,
+        code: error.code,
+        projectId: adminApp.options.projectId,
+        envProjectId: process.env.GOOGLE_CLOUD_PROJECT
+      });
+    }
+  });
+
+  // Admin: Approve/Invite User
+  app.post("/api/admin/waitlist/approve", async (req, res) => {
+    const adminUid = req.headers['x-admin-uid'] as string;
+    const { email } = req.body;
+
+    let isAuthorized = adminUid && adminUid === process.env.ADMIN_UID;
+    
+    if (!isAuthorized && adminUid) {
+      try {
+        const userDoc = await db.collection("users").doc(adminUid).get();
+        const userData = userDoc.data();
+        if (userDoc.exists && userData?.role === 'admin') {
+          isAuthorized = true;
+        } else {
+          // Fallback check for the specific admin email
+          try {
+            const userRecord = await adminAuth.getUser(adminUid);
+            if (userRecord.email === "jess@irudd.com" && userRecord.emailVerified) {
+              isAuthorized = true;
+              console.log("Admin authorized via email check:", userRecord.email);
+            }
+          } catch (authErr: any) {
+            console.error("Error fetching user record from Admin Auth (Approve):", authErr.message, "Project:", adminApp.options.projectId);
+          }
+        }
+      } catch (e) {
+        console.error("Error verifying admin role:", e);
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    try {
+      const inviteToken = crypto.randomUUID();
+      const waitlistRef = db.collection("waitlist").doc(email.toLowerCase());
+      
+      await waitlistRef.set({
+        email: email.toLowerCase(),
+        status: "approved",
+        inviteToken,
+        approvedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      // Send Invitation Email
+      await sendInviteEmail({ 
+        email: email.toLowerCase(), 
+        inviteToken,
+        type: 'early-access'
+      });
+
+      res.json({ success: true, inviteToken });
+    } catch (error: any) {
+      console.error("Error approving user. Details:", {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+        email,
+        projectId: adminApp.options.projectId
+      });
+      res.status(500).json({ error: "Failed to approve user", details: error.message });
+    }
+  });
+
+  // Activation: Unlock
+  app.get("/unlock", async (req, res) => {
+    const { token } = req.query;
+    if (!token) return res.status(400).send("Token is required");
+
+    try {
+      const snapshot = await db.collection("waitlist")
+        .where("inviteToken", "==", token)
+        .where("status", "==", "approved")
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        return res.status(403).send("Invalid or expired invitation token");
+      }
+
+      // Set secure, HTTP-only cookie
+      res.cookie('folio_access_granted', 'true', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        sameSite: 'lax'
+      });
+
+      res.redirect('/');
+    } catch (error) {
+      console.error("Error unlocking access:", error);
+      res.status(500).send("Internal server error");
+    }
+  });
 
   // Email Invite Endpoint
   app.post("/api/shares/invite", async (req, res) => {
@@ -159,6 +404,16 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  app.get("/api/admin/debug/env", (req, res) => {
+    res.json({
+      GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
+      GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
+      PROJECT_ID: process.env.PROJECT_ID,
+      NODE_ENV: process.env.NODE_ENV,
+      ADMIN_UID: process.env.ADMIN_UID ? "SET" : "NOT SET"
+    });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
