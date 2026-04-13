@@ -166,9 +166,11 @@ async function startServer() {
 
     try {
       console.log("Attempting to fetch waitlist from Firestore...");
-      console.log("Admin App Project ID:", adminApp.options.projectId);
-      const snapshot = await db.collection("waitlist").orderBy("createdAt", "desc").get();
+      console.log("Admin App Project ID:", adminApp.options.projectId || "Default");
+      const snapshot = await db.collection("waitlist").get();
       const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort in memory for now
+      entries.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       console.log(`Successfully fetched ${entries.length} waitlist entries`);
       res.json(entries);
     } catch (error: any) {
@@ -178,7 +180,6 @@ async function startServer() {
         details: error.details,
         metadata: error.metadata,
         projectId: adminApp.options.projectId,
-        databaseId: firebaseAppletConfig.firestoreDatabaseId,
         envProjectId: process.env.GOOGLE_CLOUD_PROJECT
       });
       res.status(500).json({ 
@@ -230,19 +231,28 @@ async function startServer() {
     try {
       const inviteToken = crypto.randomUUID();
       const waitlistRef = db.collection("waitlist").doc(email.toLowerCase());
+      const waitlistDoc = await waitlistRef.get();
       
-      await waitlistRef.set({
+      const updateData: any = {
         email: email.toLowerCase(),
         status: "approved",
         inviteToken,
         approvedAt: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+      };
+
+      if (!waitlistDoc.exists) {
+        updateData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+      
+      await waitlistRef.set(updateData, { merge: true });
 
       // Send Invitation Email
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
       await sendInviteEmail({ 
         email: email.toLowerCase(), 
         inviteToken,
-        type: 'early-access'
+        type: 'early-access',
+        baseUrl
       });
 
       res.json({ success: true, inviteToken });

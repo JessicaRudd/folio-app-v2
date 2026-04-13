@@ -36,9 +36,11 @@ console.log("Firebase Config at Runtime (Forced from config):", {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-const databaseId = undefined; // Force (default) database
+
+// Use the database ID from the config, or undefined for (default)
+const databaseId = firebaseAppletConfig.firestoreDatabaseId === '(default)' ? undefined : firebaseAppletConfig.firestoreDatabaseId;
 export const db = getFirestore(app, databaseId);
-console.log("Firestore Instance Initialized with DB ID: (default) [FORCED]");
+console.log("Firestore Instance Initialized with DB ID:", databaseId || "(default)");
 export const storage = getStorage(app);
 
 async function testConnection() {

@@ -18,6 +18,7 @@ export const AdminOnboarding = () => {
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [approvingId, setApprovingId] = useState<string | null>(null);
 
@@ -101,6 +102,8 @@ export const AdminOnboarding = () => {
 
       if (response.ok) {
         setInviteEmail('');
+        setInviteSuccess(true);
+        setTimeout(() => setInviteSuccess(false), 3000);
         await fetchWaitlist();
       }
     } catch (err) {
@@ -168,11 +171,20 @@ export const AdminOnboarding = () => {
             </div>
             <Button 
               type="submit" 
-              variant="primary" 
+              variant={inviteSuccess ? "secondary" : "primary"} 
               disabled={isInviting || !inviteEmail}
-              className="px-8"
+              className="px-8 min-w-[160px]"
             >
-              {isInviting ? <Loader2 className="animate-spin" size={20} /> : "Send Invitation"}
+              {isInviting ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : inviteSuccess ? (
+                <div className="flex items-center gap-2">
+                  <Check size={18} />
+                  <span>Sent</span>
+                </div>
+              ) : (
+                "Send Invitation"
+              )}
             </Button>
           </form>
         </section>

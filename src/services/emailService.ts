@@ -10,7 +10,8 @@ export async function sendInviteEmail({
   shareUrl, 
   creatorName,
   inviteToken,
-  type = 'collection'
+  type = 'collection',
+  baseUrl
 }: { 
   email: string; 
   collectionTitle?: string; 
@@ -18,6 +19,7 @@ export async function sendInviteEmail({
   creatorName?: string;
   inviteToken?: string;
   type?: 'collection' | 'early-access';
+  baseUrl?: string;
 }) {
   if (!resend) {
     const msg = 'RESEND_API_KEY not set. Skipping email send.';
@@ -27,28 +29,36 @@ export async function sendInviteEmail({
 
   const isEarlyAccess = type === 'early-access';
   const subject = isEarlyAccess 
-    ? "Your invitation to Folio has arrived. 🕊️"
+    ? "You've received your stamp! 🕊️"
     : `Invite: View ${collectionTitle} on Folio`;
 
-  const unlockUrl = `${BRAND_URL}/unlock?token=${inviteToken}`;
+  const finalBaseUrl = baseUrl || BRAND_URL;
+  const unlockUrl = `${finalBaseUrl}/unlock?token=${inviteToken}`;
 
   const html = isEarlyAccess ? `
     <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto; padding: 60px 40px; background: #fdfcfb; color: #1a1a1a; border: 1px solid #eee; border-radius: 4px;">
       <div style="text-align: center; margin-bottom: 40px;">
-        <div style="display: inline-block; width: 40px; height: 40px; background: #1a1a1a; transform: rotate(45deg); margin-bottom: 20px;">
-          <span style="display: block; transform: rotate(-45deg); color: white; font-weight: bold; font-size: 24px; line-height: 40px;">F</span>
+        <div style="display: inline-block; width: 60px; height: 60px; border: 2px dashed #1a1a1a; border-radius: 50%; padding: 5px; margin-bottom: 20px;">
+          <div style="width: 100%; height: 100%; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+            <span style="color: white; font-weight: bold; font-size: 24px;">F</span>
+          </div>
         </div>
       </div>
       
-      <h1 style="font-size: 28px; font-weight: normal; text-align: center; margin-bottom: 32px; letter-spacing: -0.02em;">Digital Invitation</h1>
+      <h1 style="font-size: 28px; font-weight: normal; text-align: center; margin-bottom: 32px; letter-spacing: -0.02em;">You've received your stamp!</h1>
       
       <p style="font-size: 18px; line-height: 1.8; margin-bottom: 40px; text-align: center; color: #444;">
-        You’ve been invited to join the Folio inner circle. Click below to unlock your private dashboard and start curating your memories.
+        The wait is over. Your invitation to the Folio inner circle has been officially stamped and delivered. 
+        We're thrilled to have you join our private beta.
+      </p>
+      
+      <p style="font-size: 16px; line-height: 1.8; margin-bottom: 40px; text-align: center; color: #666; font-style: italic;">
+        Click below to unlock your private dashboard, create your account, and start curating your most precious memories.
       </p>
       
       <div style="text-align: center; margin: 60px 0;">
-        <a href="${unlockUrl}" style="display: inline-block; border: 2px solid #1a1a1a; padding: 20px 40px; text-decoration: none; color: #1a1a1a; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; font-size: 12px; transition: all 0.3s ease;">
-          Unlock Access
+        <a href="${unlockUrl}" style="display: inline-block; background: #1a1a1a; color: white; padding: 20px 40px; text-decoration: none; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; font-size: 12px; border-radius: 4px; transition: all 0.3s ease;">
+          Unlock Your Folio
         </a>
       </div>
       
