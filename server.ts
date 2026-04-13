@@ -414,6 +414,44 @@ async function startServer() {
     }
   });
 
+  app.get("/api/admin/debug/env", (req, res) => {
+    res.json({
+      GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
+      GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
+      PROJECT_ID: process.env.PROJECT_ID,
+      NODE_ENV: process.env.NODE_ENV,
+      ADMIN_UID: process.env.ADMIN_UID ? "SET" : "NOT SET",
+      RESEND_API_KEY: process.env.RESEND_API_KEY ? `SET (${process.env.RESEND_API_KEY.substring(0, 7)}...)` : "NOT SET",
+      RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL || "DEFAULT",
+      RESEND_BRAND_URL: process.env.RESEND_BRAND_URL || "DEFAULT"
+    });
+  });
+
+  app.post("/api/admin/test-email", async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    try {
+      console.log(`Triggering test email to ${email}`);
+      const result = await sendInviteEmail({ 
+        email, 
+        inviteToken: "test-token", 
+        type: 'early-access' 
+      });
+      
+      if (result.error) {
+        console.error("Test email failed:", result.error);
+        return res.status(500).json({ error: result.error });
+      }
+      
+      console.log("Test email sent successfully:", result.data);
+      res.json({ success: true, data: result.data });
+    } catch (error: any) {
+      console.error("Error in test-email endpoint:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting Vite in development mode...");
@@ -437,16 +475,6 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  app.get("/api/admin/debug/env", (req, res) => {
-    res.json({
-      GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
-      GCLOUD_PROJECT: process.env.GCLOUD_PROJECT,
-      PROJECT_ID: process.env.PROJECT_ID,
-      NODE_ENV: process.env.NODE_ENV,
-      ADMIN_UID: process.env.ADMIN_UID ? "SET" : "NOT SET"
-    });
-  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

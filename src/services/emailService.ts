@@ -9,17 +9,22 @@ function getResend() {
       console.warn('RESEND_API_KEY is not set. Emails will not be sent.');
       return null;
     }
+    console.log(`Initializing Resend client with API key starting with: ${apiKey.substring(0, 7)}...`);
     resendClient = new Resend(apiKey);
   }
   return resendClient;
 }
 
 function getFromEmail() {
-  return process.env.RESEND_FROM_EMAIL || 'Folio <hello@curateyourfolio.com>';
+  const email = process.env.RESEND_FROM_EMAIL || 'Folio <hello@curateyourfolio.com>';
+  console.log(`Using FROM_EMAIL: ${email}`);
+  return email;
 }
 
 function getBrandUrl() {
-  return process.env.RESEND_BRAND_URL || 'https://curateyourfolio.com';
+  const url = process.env.RESEND_BRAND_URL || 'https://curateyourfolio.com';
+  console.log(`Using BRAND_URL: ${url}`);
+  return url;
 }
 
 export async function sendInviteEmail({ 
@@ -105,12 +110,17 @@ export async function sendInviteEmail({
     </div>
   `;
 
+  const text = isEarlyAccess 
+    ? `You've received your stamp! The wait is over. Your invitation to the Folio inner circle has been officially stamped and delivered. Unlock your folio here: ${unlockUrl}`
+    : `${creatorName} has invited you to view their private collection: ${collectionTitle}. View it here: ${shareUrl}`;
+
   try {
     const { data, error } = await resend.emails.send({
       from: getFromEmail(),
       to: email,
       subject,
-      html
+      html,
+      text
     });
 
     if (error) {
@@ -143,6 +153,7 @@ export async function sendOtpEmail({
       from: getFromEmail(),
       to: email,
       subject: `Your Access Code for ${collectionTitle}`,
+      text: `Your access code for ${collectionTitle} is: ${otp}`,
       html: `
         <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 40px; background: #fdfcfb; color: #1a1a1a;">
           <h1 style="font-size: 32px; margin-bottom: 24px;">Access Code</h1>
