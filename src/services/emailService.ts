@@ -120,7 +120,10 @@ export async function sendInviteEmail({
       to: email,
       subject,
       html,
-      text
+      text,
+      headers: {
+        'List-Unsubscribe': `<${getBrandUrl()}>`
+      }
     });
 
     if (error) {
@@ -154,6 +157,9 @@ export async function sendOtpEmail({
       to: email,
       subject: `Your Access Code for ${collectionTitle}`,
       text: `Your access code for ${collectionTitle} is: ${otp}`,
+      headers: {
+        'List-Unsubscribe': `<${getBrandUrl()}>`
+      },
       html: `
         <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 40px; background: #fdfcfb; color: #1a1a1a;">
           <h1 style="font-size: 32px; margin-bottom: 24px;">Access Code</h1>

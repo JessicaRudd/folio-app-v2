@@ -427,6 +427,28 @@ async function startServer() {
     });
   });
 
+  app.get("/api/admin/test-email", async (req, res) => {
+    const { email } = req.query;
+    if (!email || typeof email !== 'string') return res.status(400).json({ error: "Email query parameter is required" });
+
+    try {
+      console.log(`Triggering test email (via GET) to ${email}`);
+      const result = await sendInviteEmail({ 
+        email, 
+        inviteToken: "test-token-get", 
+        type: 'early-access' 
+      });
+      
+      if (result.error) {
+        return res.status(500).json({ error: result.error });
+      }
+      
+      res.json({ success: true, message: "Test email sent successfully", data: result.data });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/admin/test-email", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
