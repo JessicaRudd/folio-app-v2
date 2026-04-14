@@ -28,6 +28,7 @@ async function startServer() {
   app.use(cookieParser());
 
   // Gatekeeper Middleware
+  const gatekeeperMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const hasDevAccess = req.cookies.folio_dev_access === 'true';
     
     // In DEV deployments, strictly block access if the dev cookie is missing
