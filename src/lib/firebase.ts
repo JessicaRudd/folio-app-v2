@@ -4,41 +4,25 @@ import { getFirestore, getDocFromServer, doc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 // Import the local config file provided by AI Studio
-import firebaseAppletConfig from '../../firebase-applet-config.json';
-
-// In production, these can be overridden by environment variables
-// We use a safe check for import.meta.env which is common in Vite apps
-const getEnv = (key: string) => {
-  try {
-    // Vite's import.meta.env is populated at build time
-    const value = (import.meta as any).env?.[key];
-    if (value && value !== 'undefined') return value;
-    return undefined;
-  } catch {
-    return undefined;
-  }
-};
-
+// Firebase configuration using environment variables
+// Vite's import.meta.env is populated at build time
 const firebaseConfig = {
-  apiKey: firebaseAppletConfig.apiKey,
-  authDomain: firebaseAppletConfig.authDomain,
-  projectId: firebaseAppletConfig.projectId,
-  storageBucket: firebaseAppletConfig.storageBucket,
-  messagingSenderId: firebaseAppletConfig.messagingSenderId,
-  appId: firebaseAppletConfig.appId,
-  measurementId: firebaseAppletConfig.measurementId
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
-
-console.log("Firebase Config at Runtime (Forced from config):", {
-  projectId: firebaseConfig.projectId,
-  databaseId: firebaseAppletConfig.firestoreDatabaseId
-});
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Use the database ID from the config, or undefined for (default)
-const databaseId = firebaseAppletConfig.firestoreDatabaseId === '(default)' ? undefined : firebaseAppletConfig.firestoreDatabaseId;
+// Use the database ID from environment variables, or undefined for (default)
+const databaseId = (import.meta as any).env?.VITE_FIREBASE_FIRESTORE_DATABASE_ID === '(default)' 
+  ? undefined 
+  : (import.meta as any).env?.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
 export const db = getFirestore(app, databaseId);
 console.log("Firestore Instance Initialized with DB ID:", databaseId || "(default)");
 export const storage = getStorage(app);

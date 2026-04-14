@@ -8,7 +8,4 @@ if (!admin.apps.length) {
 
 export const adminApp = admin.app();
 export const auth = admin.auth(adminApp);
-export const db = getFirestore(adminApp);
-
-console.log("Firebase Admin initialized with default settings.");
-console.log("Project ID:", adminApp.options.projectId || "Discovered from environment");
+export const db = getFirestore(adminApp, process.env.FIREBASE_FIRESTORE_DATABASE_ID || '(default)');

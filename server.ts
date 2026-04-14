@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { handleReport } from "./src/services/reportService.ts";
 import { sendInviteEmail, sendOtpEmail, sendWelcomeEmail } from "./src/services/emailService.ts";
 import { db, auth as adminAuth, adminApp } from "./src/lib/firebaseAdmin.ts";
-import firebaseAppletConfig from "./firebase-applet-config.json";
+// Config removed for security. Using environment variables.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,7 +72,7 @@ async function startServer() {
       const collectionIds = collections.map(col => col.id);
       res.json({
         projectId: adminApp.options.projectId,
-        databaseId: firebaseAppletConfig.firestoreDatabaseId,
+        databaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || '(default)',
         collections: collectionIds
       });
     } catch (error: any) {
@@ -112,7 +112,15 @@ async function startServer() {
   // NOTE: In production (GCP Cloud Run), ADMIN_UID should be mapped from GCP Secret Manager 
   // to an environment variable. The code below will automatically pick it up.
   app.get("/api/auth/check-access", (req, res) => {
-    const accessGranted = req.cookies.folio_access_granted === 'true';
+    let accessGranted = req.cookies.folio_access_granted === 'true';
+
+    // In DEV deployments, we only allow access if the user is explicitly authorized.
+    // For now, we'll check if they have a special dev-access cookie or if IS_DEV_DEPLOYMENT is false.
+    if (process.env.IS_DEV_DEPLOYMENT === 'true') {
+      const devAccess = req.cookies.folio_dev_access === 'true';
+      accessGranted = accessGranted && devAccess;
+    }
+
     res.json({ accessGranted });
   });
 

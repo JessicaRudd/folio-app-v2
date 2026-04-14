@@ -1,23 +1,15 @@
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
-import firebaseAppletConfig from './firebase-applet-config.json' assert { type: 'json' };
-
-const envProjectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.PROJECT_ID;
-const projectId = envProjectId || firebaseAppletConfig.projectId;
-
-const databaseId = firebaseAppletConfig.firestoreDatabaseId === '(default)' ? undefined : firebaseAppletConfig.firestoreDatabaseId;
+const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.PROJECT_ID;
+const databaseId = process.env.FIREBASE_FIRESTORE_DATABASE_ID || '(default)';
 
 console.log("Test Script Initialization:");
-console.log("- Env Project ID:", envProjectId);
-console.log("- Config Project ID:", firebaseAppletConfig.projectId);
-console.log("- Using Project ID:", projectId);
-console.log("- Using Database ID:", databaseId || "(default)");
+console.log("- Using Project ID:", projectId || "Discovered from environment");
+console.log("- Using Database ID:", databaseId);
 
-admin.initializeApp({
-  projectId: 'folio-app-492702',
-});
+admin.initializeApp();
 
-const db = getFirestore();
+const db = getFirestore(admin.app(), databaseId === '(default)' ? undefined : databaseId);
 
 async function test() {
   try {
