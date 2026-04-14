@@ -46,6 +46,7 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
   const [accessState, setAccessState] = useState<{ granted: boolean; isDevGated: boolean } | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoginOverride, setIsLoginOverride] = useState(() => {
     return new URLSearchParams(window.location.search).get('login') === 'true';
   });
@@ -58,6 +59,19 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
     });
     return () => unsubscribe();
   }, []);
+
+  // Fetch user profile to check for Admin role
+  useEffect(() => {
+    if (!user) {
+      setUserProfile(null);
+      return;
+    }
+    return onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) {
+        setUserProfile(snap.data());
+      }
+    });
+  }, [user]);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -79,6 +93,18 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timeout);
   }, []);
 
+  // Logic to automatically set dev cookie for admins
+  useEffect(() => {
+    if (accessState?.isDevGated && !accessState.granted && userProfile) {
+      const isAdmin = userProfile.role === 'admin' || user?.email === 'jess@irudd.com';
+      if (isAdmin) {
+        console.log("Admin identity verified. Granting dev access...");
+        document.cookie = "folio_dev_access=true; path=/; max-age=31536000";
+        setAccessState(prev => prev ? { ...prev, granted: true } : prev);
+      }
+    }
+  }, [accessState, userProfile, user]);
+
   if ((accessState === null || !isAuthReady) && !isLoginOverride) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#fdfcfb]">
@@ -87,10 +113,41 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // In dev gated mode, strictly require the grant
+  // In dev gated mode, strictly require the grant (or admin identity)
   if (accessState?.isDevGated) {
     if (accessState.granted || isLoginOverride) return <>{children}</>;
-    return <WaitingRoom />;
+    
+    // Provide a secure login prompt for dev access
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fdfcfb] px-6">
+        <div className="max-w-md w-full text-center space-y-8">
+          <header className="space-y-4">
+            <h1 className="text-4xl">Dev Access Required</h1>
+            <p className="text-charcoal/60 italic">
+              This environment is restricted. Please sign in with an authorized admin account to proceed.
+            </p>
+          </header>
+          <div className="bg-white p-8 rounded-2xl border border-charcoal/5 shadow-sm space-y-6">
+            {!user ? (
+              <Button 
+                variant="primary" 
+                className="w-full"
+                onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}
+              >
+                Sign In with Google
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-red-500">
+                  Account <strong>{user.email}</strong> is not authorized for dev access.
+                </p>
+                <Button variant="ghost" onClick={() => signOut(auth)}>Sign Out</Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // In production, grant access if cookie is present OR user is logged in OR we are trying to login

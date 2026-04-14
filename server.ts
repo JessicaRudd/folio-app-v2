@@ -31,18 +31,11 @@ async function startServer() {
   const gatekeeperMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const hasDevAccess = req.cookies.folio_dev_access === 'true';
     
-    // In DEV deployments, strictly block access if the dev cookie is missing
+    const hasDevAccess = req.cookies.folio_dev_access === 'true';
+    
+    // Dev environment check (passive on server, the React app handles identity verification)
     if (process.env.IS_DEV_DEPLOYMENT === 'true' && !hasDevAccess) {
-      return res.status(403).send(`
-        <div style="font-family: sans-serif; padding: 40px; text-align: center;">
-          <h1>Access Denied (Dev Environment)</h1>
-          <p>This environment is restricted to authorized admins.</p>
-          <p>Please run the following in your browser console to gain access:</p>
-          <code style="background: #eee; padding: 10px; display: block; margin: 20px auto; max-width: 600px;">
-            document.cookie = "folio_dev_access=true; path=/; max-age=31536000"; location.reload();
-          </code>
-        </div>
-      `);
+      console.log(`[Gatekeeper] Dev environment access check failed for ${req.path}`);
     }
 
     next();
