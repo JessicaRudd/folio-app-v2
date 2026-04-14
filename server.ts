@@ -269,7 +269,7 @@ async function startServer() {
       await waitlistRef.set(updateData, { merge: true });
 
       // Send Invitation Email
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = process.env.RESEND_BRAND_URL || `https://${req.get('host')}`;
       console.log(`Attempting to send invitation email to ${email.toLowerCase()} via ${baseUrl}`);
       
       const emailResult = await sendInviteEmail({ 
@@ -313,6 +313,7 @@ async function startServer() {
     if (!token) return res.status(400).send("Token is required");
 
     try {
+      // First, try to find the approved user
       const snapshot = await db.collection("waitlist")
         .where("inviteToken", "==", token)
         .where("status", "==", "approved")
@@ -321,21 +322,24 @@ async function startServer() {
 
       if (snapshot.empty) {
         console.warn(`Unlock failed: No approved user found with token "${token}"`);
-        // Let's also check if the token exists but status isn't approved
+        
+        // Check if the token exists but status isn't approved
         const anyTokenSnap = await db.collection("waitlist")
           .where("inviteToken", "==", token)
           .limit(1)
           .get();
         
         if (!anyTokenSnap.empty) {
-          const doc = anyTokenSnap.docs[0].data();
-          console.warn(`Token found but status is "${doc.status}" instead of "approved"`);
+          const docData = anyTokenSnap.docs[0].data();
+          console.warn(`Token found for ${anyTokenSnap.docs[0].id} but status is "${docData.status}" instead of "approved"`);
+          return res.status(403).send(`Your invitation status is currently "${docData.status}". Please wait for approval.`);
         }
 
-        return res.status(403).send("Invalid or expired invitation token");
+        return res.status(403).send("Invalid or expired invitation token. Please ensure you clicked the link correctly.");
       }
 
-      console.log(`Unlock successful for user: ${snapshot.docs[0].id}`);
+      const userDoc = snapshot.docs[0];
+      console.log(`Unlock successful for user: ${userDoc.id}`);
 
       // Set secure, HTTP-only cookie
       res.cookie('folio_access_granted', 'true', {

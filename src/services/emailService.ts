@@ -115,14 +115,17 @@ export async function sendInviteEmail({
     : `${creatorName} has invited you to view their private collection: ${collectionTitle}. View it here: ${shareUrl}`;
 
   try {
+    const from = getFromEmail();
     const { data, error } = await resend.emails.send({
-      from: getFromEmail(),
+      from,
       to: email,
+      reply_to: from,
       subject,
       html,
       text,
       headers: {
-        'List-Unsubscribe': `<${getBrandUrl()}>`
+        'List-Unsubscribe': `<${getBrandUrl()}>`,
+        'X-Entity-Ref-ID': inviteToken || Date.now().toString()
       }
     });
 
@@ -152,13 +155,16 @@ export async function sendOtpEmail({
   }
 
   try {
+    const from = getFromEmail();
     const { data, error } = await resend.emails.send({
-      from: getFromEmail(),
+      from,
       to: email,
+      reply_to: from,
       subject: `Your Access Code for ${collectionTitle}`,
       text: `Your access code for ${collectionTitle} is: ${otp}`,
       headers: {
-        'List-Unsubscribe': `<${getBrandUrl()}>`
+        'List-Unsubscribe': `<${getBrandUrl()}>`,
+        'X-Entity-Ref-ID': `otp-${Date.now()}`
       },
       html: `
         <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 40px; background: #fdfcfb; color: #1a1a1a;">
@@ -263,14 +269,17 @@ Folio © 2026
   `.trim();
 
   try {
+    const from = getFromEmail();
     const { data, error } = await resend.emails.send({
-      from: getFromEmail(),
+      from,
       to: email,
+      reply_to: from,
       subject,
       html,
       text,
       headers: {
-        'List-Unsubscribe': `<${brandUrl}>`
+        'List-Unsubscribe': `<${brandUrl}>`,
+        'X-Entity-Ref-ID': `welcome-${Date.now()}`
       }
     });
 
