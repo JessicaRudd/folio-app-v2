@@ -95,9 +95,12 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
 
   // Logic to automatically set dev cookie for admins
   useEffect(() => {
-    if (accessState?.isDevGated && !accessState.granted && userProfile) {
-      const isAdmin = userProfile.role === 'admin' || user?.email === 'jess@irudd.com';
-      if (isAdmin) {
+    if (accessState?.isDevGated && !accessState.granted && user) {
+      // Check both hardcoded admin email and the Firestore user profile role
+      const isHardcodedAdmin = user.email === 'jess@irudd.com' || user.email === 'jessica.rudd@gmail.com';
+      const isRoleAdmin = userProfile?.role === 'admin';
+      
+      if (isHardcodedAdmin || isRoleAdmin) {
         console.log("Admin identity verified. Granting dev access...");
         document.cookie = "folio_dev_access=true; path=/; max-age=31536000";
         setAccessState(prev => prev ? { ...prev, granted: true } : prev);
@@ -132,7 +135,14 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
               <Button 
                 variant="primary" 
                 className="w-full"
-                onClick={() => signInWithPopup(auth, new GoogleAuthProvider())}
+                onClick={async () => {
+                  try {
+                    await signInWithPopup(auth, new GoogleAuthProvider());
+                  } catch (err: any) {
+                    console.error("Login Error:", err);
+                    alert(`Login failed: ${err.message}. If this is a new deployment, ensure the domain is added to Firebase Authorized Domains.`);
+                  }
+                }}
               >
                 Sign In with Google
               </Button>
