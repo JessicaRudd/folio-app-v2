@@ -122,7 +122,7 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
     
     // Provide a secure login prompt for dev access
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fdfcfb] px-6">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#fdfcfb] px-6">
         <div className="max-w-md w-full text-center space-y-8">
           <header className="space-y-4">
             <h1 className="text-4xl">Dev Access Required</h1>
@@ -132,20 +132,28 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
           </header>
           <div className="bg-white p-8 rounded-2xl border border-charcoal/5 shadow-sm space-y-6">
             {!user ? (
-              <Button 
-                variant="primary" 
-                className="w-full"
-                onClick={async () => {
-                  try {
-                    await signInWithPopup(auth, new GoogleAuthProvider());
-                  } catch (err: any) {
-                    console.error("Login Error:", err);
-                    alert(`Login failed: ${err.message}. If this is a new deployment, ensure the domain is added to Firebase Authorized Domains.`);
-                  }
-                }}
-              >
-                Sign In with Google
-              </Button>
+              <div className="space-y-4">
+                <Button 
+                  variant="primary" 
+                  className="w-full"
+                  onClick={async () => {
+                    try {
+                      await signInWithPopup(auth, new GoogleAuthProvider());
+                    } catch (err: any) {
+                      console.error("Login Error:", err);
+                      alert(`Login failed: ${err.message}. If this is a new deployment, ensure the domain is added to Firebase Authorized Domains.`);
+                    }
+                  }}
+                >
+                  Sign In with Google
+                </Button>
+                <button 
+                  onClick={() => setIsLoginOverride(true)}
+                  className="text-xs text-charcoal/20 hover:text-sage transition-colors uppercase tracking-widest font-bold"
+                >
+                  Return to Landing Page
+                </button>
+              </div>
             ) : (
               <div className="space-y-4">
                 <p className="text-sm text-red-500">

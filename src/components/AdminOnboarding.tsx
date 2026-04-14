@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, UserPlus, Check, Mail, Loader2, Shield, Search, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Users, UserPlus, Check, Mail, Loader2, Shield, Search, ExternalLink, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/Button';
 import { auth } from '../lib/firebase';
 
@@ -133,17 +134,35 @@ export const AdminOnboarding = () => {
       {/* Header */}
       <header className="bg-white border-b border-charcoal/5 px-8 py-6 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-charcoal rounded-lg flex items-center justify-center text-white">
-              <Shield size={20} />
+          <div className="flex items-center justify-between w-full md:w-auto">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-charcoal rounded-lg flex items-center justify-center text-white">
+                <Shield size={20} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-serif">Gatekeeper</h1>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Admin Onboarding Dashboard</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-serif">Gatekeeper</h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-charcoal/40">Admin Onboarding Dashboard</p>
-            </div>
+
+            <Link 
+              to="/" 
+              className="md:hidden flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40 hover:text-sage transition-colors"
+            >
+              <ArrowLeft size={14} />
+              <span>Folio</span>
+            </Link>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            <Link 
+              to="/" 
+              className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40 hover:text-sage transition-colors px-4 py-2 rounded-full border border-charcoal/5 hover:border-sage/20"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Folio</span>
+            </Link>
+            
             <div className="bg-sage/10 px-4 py-2 rounded-full border border-sage/20">
               <span className="text-xs font-bold text-sage uppercase tracking-widest">{pendingCount} Pending Requests</span>
             </div>
