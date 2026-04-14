@@ -28,24 +28,22 @@ async function startServer() {
   app.use(cookieParser());
 
   // Gatekeeper Middleware
-  const gatekeeperMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // Skip gatekeeper for API routes, static assets, and the unlock route
-    if (
-      req.path.startsWith('/api/') || 
-      req.path.startsWith('/unlock') || 
-      req.path.includes('.') || // Static files usually have dots
-      req.path.startsWith('/@') || // Vite internal
-      req.path.startsWith('/src/') || // Vite internal
-      req.path.startsWith('/node_modules/') // Vite internal
-    ) {
-      return next();
+    const hasDevAccess = req.cookies.folio_dev_access === 'true';
+    
+    // In DEV deployments, strictly block access if the dev cookie is missing
+    if (process.env.IS_DEV_DEPLOYMENT === 'true' && !hasDevAccess) {
+      return res.status(403).send(`
+        <div style="font-family: sans-serif; padding: 40px; text-align: center;">
+          <h1>Access Denied (Dev Environment)</h1>
+          <p>This environment is restricted to authorized admins.</p>
+          <p>Please run the following in your browser console to gain access:</p>
+          <code style="background: #eee; padding: 10px; display: block; margin: 20px auto; max-width: 600px;">
+            document.cookie = "folio_dev_access=true; path=/; max-age=31536000"; location.reload();
+          </code>
+        </div>
+      `);
     }
 
-    const accessGranted = req.cookies.folio_access_granted === 'true';
-    
-    // If it's a page request and no access cookie, we'll let the React app handle it
-    // but we'll inject a header or something if we wanted to be strict.
-    // For now, we'll just continue and let the React app's "Bouncer" component handle the UI.
     next();
   };
 
@@ -114,14 +112,15 @@ async function startServer() {
   app.get("/api/auth/check-access", (req, res) => {
     let accessGranted = req.cookies.folio_access_granted === 'true';
 
-    // In DEV deployments, we only allow access if the user is explicitly authorized.
-    // For now, we'll check if they have a special dev-access cookie or if IS_DEV_DEPLOYMENT is false.
     if (process.env.IS_DEV_DEPLOYMENT === 'true') {
       const devAccess = req.cookies.folio_dev_access === 'true';
       accessGranted = accessGranted && devAccess;
     }
 
-    res.json({ accessGranted });
+    res.json({ 
+      accessGranted,
+      isDevGated: process.env.IS_DEV_DEPLOYMENT === 'true'
+    });
   });
 
   // GitHub Report Endpoint

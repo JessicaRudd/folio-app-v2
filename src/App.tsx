@@ -43,7 +43,7 @@ const MOCK_FOLIOS = [
 ];
 
 function Gatekeeper({ children }: { children: React.ReactNode }) {
-  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [accessState, setAccessState] = useState<{ granted: boolean; isDevGated: boolean } | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isLoginOverride, setIsLoginOverride] = useState(() => {
@@ -64,22 +64,22 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
       try {
         const response = await fetch('/api/auth/check-access');
         const data = await response.json();
-        setHasAccess(data.accessGranted);
+        setAccessState({ granted: data.accessGranted, isDevGated: data.isDevGated });
       } catch (err) {
-        setHasAccess(false);
+        setAccessState({ granted: false, isDevGated: false });
       }
     };
     checkAccess();
 
     // Safety timeout for access check
     const timeout = setTimeout(() => {
-      setHasAccess(prev => prev === null ? false : prev);
+      setAccessState(prev => prev === null ? { granted: false, isDevGated: false } : prev);
     }, 3000);
     
     return () => clearTimeout(timeout);
   }, []);
 
-  if ((hasAccess === null || !isAuthReady) && !isLoginOverride) {
+  if ((accessState === null || !isAuthReady) && !isLoginOverride) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#fdfcfb]">
         <Loader2 className="animate-spin text-sage" size={32} />
@@ -87,8 +87,14 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Grant access if cookie is present OR user is logged in OR we are trying to login
-  if (hasAccess || user || isLoginOverride) {
+  // In dev gated mode, strictly require the grant
+  if (accessState?.isDevGated) {
+    if (accessState.granted || isLoginOverride) return <>{children}</>;
+    return <WaitingRoom />;
+  }
+
+  // In production, grant access if cookie is present OR user is logged in OR we are trying to login
+  if (accessState?.granted || user || isLoginOverride) {
     return <>{children}</>;
   }
 
