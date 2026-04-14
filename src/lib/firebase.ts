@@ -7,22 +7,22 @@ import { getStorage } from 'firebase/storage';
 // Firebase configuration using environment variables
 // Vite's import.meta.env is populated at build time
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_FB_V1,
+  authDomain: import.meta.env.VITE_FB_V2,
+  projectId: import.meta.env.VITE_FB_V3,
+  storageBucket: import.meta.env.VITE_FB_V4,
+  messagingSenderId: import.meta.env.VITE_FB_V5,
+  appId: import.meta.env.VITE_FB_V6,
+  measurementId: import.meta.env.VITE_FB_V7
 };
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Use the database ID from environment variables, or undefined for (default)
-const databaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID === '(default)' 
+const databaseId = import.meta.env.VITE_FB_V8 === '(default)' 
   ? undefined 
-  : import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
+  : import.meta.env.VITE_FB_V8;
 export const db = getFirestore(app, databaseId);
 console.log("Firestore Instance Initialized with DB ID:", databaseId || "(default)");
 export const storage = getStorage(app);

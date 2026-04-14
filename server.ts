@@ -31,8 +31,6 @@ async function startServer() {
   const gatekeeperMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const hasDevAccess = req.cookies.folio_dev_access === 'true';
     
-    const hasDevAccess = req.cookies.folio_dev_access === 'true';
-    
     // Dev environment check (passive on server, the React app handles identity verification)
     if (process.env.IS_DEV_DEPLOYMENT === 'true' && !hasDevAccess) {
       console.log(`[Gatekeeper] Dev environment access check failed for ${req.path}`);

@@ -49,6 +49,7 @@ jobs:
             --build-arg FB_V5=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }} \
             --build-arg FB_V6=${{ secrets.FIREBASE_APP_ID }} \
             --build-arg FB_V7=${{ secrets.FIREBASE_MEASUREMENT_ID }} \
+            --build-arg FB_V8=${{ secrets.FIREBASE_FIRESTORE_DATABASE_ID }} \
             -t us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }} \
             -t us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest .
           
