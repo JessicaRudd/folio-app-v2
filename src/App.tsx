@@ -147,12 +147,14 @@ function Gatekeeper({ children }: { children: React.ReactNode }) {
                 >
                   Sign In with Google
                 </Button>
-                <button 
+                <Button 
+                  variant="outline" 
                   onClick={() => setIsLoginOverride(true)}
-                  className="text-xs text-charcoal/20 hover:text-sage transition-colors uppercase tracking-widest font-bold"
+                  className="w-full text-xs font-bold uppercase tracking-widest"
                 >
+                  <ArrowLeft size={14} className="mr-2" />
                   Return to Landing Page
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">

@@ -147,7 +147,7 @@ export const AdminOnboarding = () => {
 
             <Link 
               to="/" 
-              className="md:hidden flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40 hover:text-sage transition-colors"
+              className="md:hidden flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/60 hover:text-sage transition-colors"
             >
               <ArrowLeft size={14} />
               <span>Folio</span>
@@ -157,7 +157,7 @@ export const AdminOnboarding = () => {
           <div className="flex items-center gap-6">
             <Link 
               to="/" 
-              className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40 hover:text-sage transition-colors px-4 py-2 rounded-full border border-charcoal/5 hover:border-sage/20"
+              className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/60 hover:text-sage transition-colors px-4 py-2 rounded-full border border-charcoal/20 hover:border-sage/40 bg-charcoal/5"
             >
               <ArrowLeft size={14} />
               <span>Back to Folio</span>
