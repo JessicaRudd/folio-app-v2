@@ -117,16 +117,11 @@ export async function sendInviteEmail({
   try {
     const from = getFromEmail();
     const { data, error } = await resend.emails.send({
-      from,
+      from: from.includes('<') ? from.split('<')[1].replace('>', '') : from,
       to: email,
-      replyTo: from,
       subject,
       html,
-      text,
-      headers: {
-        'List-Unsubscribe': `<${getBrandUrl()}>`,
-        'X-Entity-Ref-ID': inviteToken || Date.now().toString()
-      }
+      text
     });
 
     if (error) {
@@ -159,15 +154,10 @@ export async function sendOtpEmail({
   try {
     const from = getFromEmail();
     const { data, error } = await resend.emails.send({
-      from,
+      from: from.includes('<') ? from.split('<')[1].replace('>', '') : from,
       to: email,
-      replyTo: from,
       subject: `Your Access Code for ${collectionTitle}`,
       text: `Your access code for ${collectionTitle} is: ${otp}`,
-      headers: {
-        'List-Unsubscribe': `<${getBrandUrl()}>`,
-        'X-Entity-Ref-ID': `otp-${Date.now()}`
-      },
       html: `
         <div style="font-family: serif; max-width: 600px; margin: 0 auto; padding: 40px; background: #fdfcfb; color: #1a1a1a;">
           <h1 style="font-size: 32px; margin-bottom: 24px;">Access Code</h1>
@@ -275,16 +265,11 @@ Folio © 2026
   try {
     const from = getFromEmail();
     const { data, error } = await resend.emails.send({
-      from,
+      from: from.includes('<') ? from.split('<')[1].replace('>', '') : from,
       to: email,
-      replyTo: from,
       subject,
       html,
-      text,
-      headers: {
-        'List-Unsubscribe': `<${brandUrl}>`,
-        'X-Entity-Ref-ID': `welcome-${Date.now()}`
-      }
+      text
     });
 
     if (error) {
