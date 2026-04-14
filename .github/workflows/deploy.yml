@@ -4,17 +4,19 @@ on:
   push:
     branches:
       - main
+      - develop
 
 env:
-  PROJECT_ID: folio-app-492702
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   REGION: us-central1
   REPO_NAME: folio-repo
-  SERVICE_NAME: folio-app
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   deploy:
+    name: Deploy to ${{ github.ref_name == 'main' && 'Production' || 'Development' }}
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'development' }}
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,43 +34,43 @@ jobs:
       - name: Deploy Firebase Rules
         run: |
           npm install -g firebase-tools
-          # The GCP_SA_KEY provided to google-github-actions/auth is automatically used by firebase-tools
-          firebase deploy --only firestore:rules,storage --project ${{ env.PROJECT_ID }} --force
+          firebase deploy --only firestore:rules,storage --project ${{ vars.PROJECT_ID }} --force
 
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
       - name: Build and Push Images
         run: |
-          # Build and push the web app with both the Git SHA (for versioning) and 'latest'
           docker build \
             --build-arg VITE_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }} \
-            -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }} \
-            -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest .
-          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }}
-          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest
+            --build-arg VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }} \
+            --build-arg VITE_FIREBASE_PROJECT_ID=${{ vars.PROJECT_ID }} \
+            --build-arg VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }} \
+            --build-arg VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }} \
+            --build-arg VITE_FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }} \
+            --build-arg VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }} \
+            -t us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }} \
+            -t us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest .
           
-          # Pull from GitHub Container Registry (GHCR) instead of Docker Hub
-          # GHCR is more reliable within GitHub Actions and avoids Docker Hub rate limits
+          docker push us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }}
+          docker push us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/web:latest
+          
           docker pull ghcr.io/imgproxy/imgproxy:latest
-          docker tag ghcr.io/imgproxy/imgproxy:latest us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
-          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
+          docker tag ghcr.io/imgproxy/imgproxy:latest us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
+          docker push us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest
 
       - name: Deploy to Cloud Run
         run: |
-          # Delete the existing service to clear out any zombie containers from previous failed deployments
-          # This ensures we start fresh with only the 'web' and 'image-proc' containers
-          gcloud run services delete ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --quiet || true
-
-          gcloud beta run deploy ${{ env.SERVICE_NAME }} \
+          # Use beta deploy for multi-container support
+          gcloud beta run deploy ${{ vars.SERVICE_NAME }} \
             --region=${{ env.REGION }} \
             --allow-unauthenticated \
             --quiet \
             --container web \
-              --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }} \
+              --image us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }} \
               --port 3000 \
-              --set-secrets FIREBASE_API_KEY=FIREBASE_API_KEY:latest,MUSIC_KIT_TOKEN=MUSIC_KIT_TOKEN:latest,GITHUB_FEEDBACK_TOKEN=GITHUB_FEEDBACK_TOKEN:latest,RESEND_API_KEY=RESEND_API_KEY:latest \
-              --set-env-vars GITHUB_REPO_OWNER=JessicaRudd,GITHUB_REPO_NAME=folio-app-v2,RESEND_FROM_EMAIL="Folio <hello@curateyourfolio.com>",RESEND_BRAND_URL=https://curateyourfolio.com \
+              --set-secrets "FIREBASE_API_KEY=FIREBASE_API_KEY:latest,MUSIC_KIT_TOKEN=MUSIC_KIT_TOKEN:latest,GITHUB_FEEDBACK_TOKEN=GITHUB_FEEDBACK_TOKEN:latest,RESEND_API_KEY=RESEND_API_KEY:latest" \
+              --set-env-vars "GITHUB_REPO_OWNER=${{ vars.GITHUB_REPO_OWNER }},GITHUB_REPO_NAME=${{ vars.GITHUB_REPO_NAME }},RESEND_FROM_EMAIL=${{ vars.RESEND_FROM_EMAIL }},RESEND_BRAND_URL=${{ vars.RESEND_BRAND_URL }},FIREBASE_FIRESTORE_DATABASE_ID=${{ vars.FIREBASE_FIRESTORE_DATABASE_ID }},IS_DEV_DEPLOYMENT=${{ github.ref_name == 'develop' && 'true' || 'false' }}" \
             --container image-proc \
-              --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest \
+              --image us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest \
               --set-env-vars IMGPROXY_LISTEN=:8080,IMGPROXY_MAX_SRC_RESOLUTION=50
