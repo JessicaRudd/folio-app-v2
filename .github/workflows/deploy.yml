@@ -70,8 +70,8 @@ jobs:
             --container web \
               --image us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/web:${{ github.sha }} \
               --port 3000 \
-              --set-secrets "FIREBASE_API_KEY=FIREBASE_API_KEY:latest,MUSIC_KIT_TOKEN=MUSIC_KIT_TOKEN:latest,GITHUB_FEEDBACK_TOKEN=GITHUB_FEEDBACK_TOKEN:latest,RESEND_API_KEY=RESEND_API_KEY:latest" \
-              --set-env-vars "GITHUB_REPO_OWNER=${{ vars.GITHUB_REPO_OWNER }},GITHUB_REPO_NAME=${{ vars.GITHUB_REPO_NAME }},RESEND_FROM_EMAIL=${{ vars.RESEND_FROM_EMAIL }},RESEND_BRAND_URL=${{ vars.RESEND_BRAND_URL }},FIREBASE_FIRESTORE_DATABASE_ID=${{ vars.FIREBASE_FIRESTORE_DATABASE_ID }},IS_DEV_DEPLOYMENT=${{ github.ref_name == 'develop' && 'true' || 'false' }}" \
+              --set-secrets "ORG_FEEDBACK_TOKEN=GITHUB_FEEDBACK_TOKEN:latest,FIREBASE_API_KEY=FIREBASE_API_KEY:latest,MUSIC_KIT_TOKEN=MUSIC_KIT_TOKEN:latest,RESEND_API_KEY=RESEND_API_KEY:latest" \
+              --set-env-vars "ORG_REPO_OWNER=${{ vars.ORG_REPO_OWNER }},ORG_REPO_NAME=${{ vars.ORG_REPO_NAME }},RESEND_FROM_EMAIL=${{ vars.RESEND_FROM_EMAIL }},RESEND_BRAND_URL=${{ vars.RESEND_BRAND_URL }},FIREBASE_FIRESTORE_DATABASE_ID=${{ vars.FIREBASE_FIRESTORE_DATABASE_ID }},IS_DEV_DEPLOYMENT=${{ github.ref_name == 'develop' && 'true' || 'false' }}" \
             --container image-proc \
               --image us-central1-docker.pkg.dev/${{ vars.PROJECT_ID }}/${{ env.REPO_NAME }}/imgproxy:latest \
               --set-env-vars IMGPROXY_LISTEN=:8080,IMGPROXY_MAX_SRC_RESOLUTION=50

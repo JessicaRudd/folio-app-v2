@@ -43,11 +43,11 @@ async function startServer() {
 
   console.log("Environment check:", {
     NODE_ENV: process.env.NODE_ENV,
-    hasToken: !!process.env.GITHUB_FEEDBACK_TOKEN,
-    hasOwner: !!process.env.GITHUB_REPO_OWNER,
-    hasRepo: !!process.env.GITHUB_REPO_NAME,
-    owner: process.env.GITHUB_REPO_OWNER,
-    repo: process.env.GITHUB_REPO_NAME
+    hasToken: !!process.env.ORG_FEEDBACK_TOKEN,
+    hasOwner: !!process.env.ORG_REPO_OWNER,
+    hasRepo: !!process.env.ORG_REPO_NAME,
+    owner: process.env.ORG_REPO_OWNER,
+    repo: process.env.ORG_REPO_NAME
   });
 
   // Diagnostic: List Collections
@@ -91,9 +91,9 @@ async function startServer() {
       status: "ok",
       environment: process.env.NODE_ENV || 'development',
       config: {
-        hasToken: !!process.env.GITHUB_FEEDBACK_TOKEN,
-        hasOwner: !!process.env.GITHUB_REPO_OWNER,
-        hasRepo: !!process.env.GITHUB_REPO_NAME
+        hasToken: !!process.env.ORG_FEEDBACK_TOKEN,
+        hasOwner: !!process.env.ORG_REPO_OWNER,
+        hasRepo: !!process.env.ORG_REPO_NAME
       }
     });
   });

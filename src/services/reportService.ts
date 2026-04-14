@@ -3,9 +3,9 @@ import { Octokit } from "octokit";
 export const handleReport = async (req: any, res: any) => {
   try {
     const { message, identity, url, userAgent, summary, type = 'feedback', stack } = req.body;
-    const token = process.env.GITHUB_FEEDBACK_TOKEN?.trim();
-    const owner = process.env.GITHUB_REPO_OWNER?.trim();
-    const repo = process.env.GITHUB_REPO_NAME?.trim();
+    const token = process.env.ORG_FEEDBACK_TOKEN?.trim();
+    const owner = process.env.ORG_REPO_OWNER?.trim();
+    const repo = process.env.ORG_REPO_NAME?.trim();
 
     if (!token || !owner || !repo) {
       console.error("Missing GitHub configuration:", { 

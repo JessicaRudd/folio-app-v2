@@ -151,7 +151,7 @@ export const FeedbackModal = ({ isOpen, onClose, user }: FeedbackModalProps) => 
                     The feedback system is not yet configured in this environment.
                   </p>
                   <p className="text-charcoal/40 text-sm italic">
-                    Please ensure GITHUB_FEEDBACK_TOKEN, GITHUB_REPO_OWNER, and GITHUB_REPO_NAME are set in the environment.
+                    Please ensure ORG_FEEDBACK_TOKEN, ORG_REPO_OWNER, and ORG_REPO_NAME are set in the environment.
                   </p>
                 </div>
                 <Button 
