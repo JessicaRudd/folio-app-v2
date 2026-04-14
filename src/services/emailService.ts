@@ -119,7 +119,7 @@ export async function sendInviteEmail({
     const { data, error } = await resend.emails.send({
       from,
       to: email,
-      reply_to: from,
+      replyTo: from,
       subject,
       html,
       text,
@@ -159,7 +159,7 @@ export async function sendOtpEmail({
     const { data, error } = await resend.emails.send({
       from,
       to: email,
-      reply_to: from,
+      replyTo: from,
       subject: `Your Access Code for ${collectionTitle}`,
       text: `Your access code for ${collectionTitle} is: ${otp}`,
       headers: {
@@ -273,7 +273,7 @@ Folio © 2026
     const { data, error } = await resend.emails.send({
       from,
       to: email,
-      reply_to: from,
+      replyTo: from,
       subject,
       html,
       text,

@@ -218,6 +218,16 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
+      // Validation: Check for file size (10MB limit)
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+      const oversizedFiles = files.filter(file => file.size > MAX_FILE_SIZE);
+      
+      if (oversizedFiles.length > 0) {
+        const fileNames = oversizedFiles.map(f => f.name).join(', ');
+        alert(`The following files are too large: ${fileNames}. Maximum file size is 10MB.`);
+        return;
+      }
+
       const limits = userStats?.role === 'admin' ? APP_LIMITS.ADMIN : (userStats?.isPremium ? APP_LIMITS.PREMIUM : APP_LIMITS.FREE);
       const totalFiles = mediaFiles.length + files.length;
       
