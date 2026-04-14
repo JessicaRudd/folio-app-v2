@@ -271,8 +271,9 @@ async function startServer() {
       const baseUrl = process.env.RESEND_BRAND_URL || `https://${req.get('host')}`;
       console.log(`Attempting to send invitation email to ${email.toLowerCase()} via ${baseUrl}`);
       
+      const targetEmail = email.toLowerCase().trim();
       const emailResult = await sendInviteEmail({ 
-        email: email.toLowerCase(), 
+        email: targetEmail, 
         inviteToken,
         type: 'early-access',
         baseUrl
