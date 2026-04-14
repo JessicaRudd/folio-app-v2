@@ -593,6 +593,9 @@ export const GuestView = () => {
                 collectionVisibility={collectionData?.visibility}
                 folioToken={folioToken || collectionData?.folioToken}
                 profilePrivacy={creator?.profilePrivacy}
+                showStamp={postcard.showStamp}
+                creatorRole={postcard.creatorRole}
+                creatorIsPremium={postcard.creatorIsPremium}
               />
             ))}
           </div>

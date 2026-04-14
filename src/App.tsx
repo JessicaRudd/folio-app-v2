@@ -499,6 +499,9 @@ function CreatorDashboard() {
                       collectionVisibility={postcard.collectionVisibility}
                       folioToken={postcard.folioToken}
                       profilePrivacy={userProfile?.profilePrivacy}
+                      showStamp={postcard.showStamp}
+                      creatorRole={postcard.creatorRole}
+                      creatorIsPremium={postcard.creatorIsPremium}
                     />
                   ))
                 )}

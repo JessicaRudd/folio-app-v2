@@ -43,6 +43,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
   const [location, setLocation] = useState('');
   const [postcardDate, setPostcardDate] = useState(new Date().toISOString().split('T')[0]);
   const [musicVibe, setMusicVibe] = useState<MusicVibe | null>(null);
+  const [showStamp, setShowStamp] = useState(true);
   
   // Collection State
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -480,7 +481,10 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           collectionVisibility,
           collectionPrivacy,
           folioToken: folioToken || '',
-          profilePrivacy: userStats?.profilePrivacy || 'private'
+          profilePrivacy: userStats?.profilePrivacy || 'private',
+          showStamp: (userStats?.role === 'admin' || userStats?.isPremium) ? showStamp : true,
+          creatorRole: userStats?.role || 'user',
+          creatorIsPremium: userStats?.isPremium || false
         });
 
         // 4. Update Metadata
@@ -975,6 +979,22 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
                       />
                     </div>
                   </div>
+
+                  {(userStats?.role === 'admin' || userStats?.isPremium) && (
+                    <div className="flex items-center gap-2 p-4 bg-sage/5 rounded-xl border border-sage/10">
+                      <input 
+                        type="checkbox" 
+                        id="showStamp" 
+                        checked={showStamp}
+                        onChange={(e) => setShowStamp(e.target.checked)}
+                        className="w-4 h-4 rounded border-charcoal/20 text-sage focus:ring-sage"
+                      />
+                      <label htmlFor="showStamp" className="text-xs font-bold text-charcoal/60 cursor-pointer flex items-center gap-2">
+                        Display Postcard Stamp
+                        <span className="text-[10px] font-normal italic opacity-60">(Custom location stamp)</span>
+                      </label>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

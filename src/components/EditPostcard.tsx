@@ -29,6 +29,7 @@ interface EditPostcardProps {
     postcardDate: string;
     musicVibe?: MusicVibe | null;
     collectionId: string;
+    showStamp?: boolean;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -43,6 +44,7 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
   const [location, setLocation] = useState(postcard.location || '');
   const [postcardDate, setPostcardDate] = useState(postcard.postcardDate);
   const [musicVibe, setMusicVibe] = useState<MusicVibe | null>(postcard.musicVibe || null);
+  const [showStamp, setShowStamp] = useState(postcard.showStamp !== false);
   
   const [showPhotoDeleteConfirm, setShowPhotoDeleteConfirm] = useState(false);
   const [userStats, setUserStats] = useState<any>(null);
@@ -257,7 +259,10 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
         mediaUrls: finalMediaUrls,
         postcardDate: postcardDate || new Date().toISOString().split('T')[0],
         musicVibe: musicVibe || null,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        showStamp: (userStats?.role === 'admin' || userStats?.isPremium) ? showStamp : true,
+        creatorRole: userStats?.role || 'user',
+        creatorIsPremium: userStats?.isPremium || false
       };
 
       if (coordinates) {
@@ -463,6 +468,22 @@ export const EditPostcard = ({ postcard, onClose, onSuccess }: EditPostcardProps
                 />
               </div>
             </div>
+
+            {(userStats?.role === 'admin' || userStats?.isPremium) && (
+              <div className="flex items-center gap-2 p-4 bg-sage/5 rounded-xl border border-sage/10">
+                <input 
+                  type="checkbox" 
+                  id="showStamp" 
+                  checked={showStamp}
+                  onChange={(e) => setShowStamp(e.target.checked)}
+                  className="w-4 h-4 rounded border-charcoal/20 text-sage focus:ring-sage"
+                />
+                <label htmlFor="showStamp" className="text-xs font-bold text-charcoal/60 cursor-pointer flex items-center gap-2">
+                  Display Postcard Stamp
+                  <span className="text-[10px] font-normal italic opacity-60">(Custom location stamp)</span>
+                </label>
+              </div>
+            )}
           </div>
         </div>
 

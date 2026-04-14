@@ -271,6 +271,9 @@ export const PublicCollectionView = () => {
               collectionPrivacy={collectionData?.privacy}
               collectionVisibility={collectionData?.visibility}
               profilePrivacy={creator?.profilePrivacy}
+              showStamp={postcard.showStamp}
+              creatorRole={postcard.creatorRole}
+              creatorIsPremium={postcard.creatorIsPremium}
             />
           </motion.div>
         ))}

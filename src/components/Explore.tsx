@@ -433,6 +433,9 @@ export const Explore = () => {
                       collectionPrivacy={postcard.collectionPrivacy || 'public'}
                       collectionVisibility={postcard.collectionVisibility || 'public'}
                       profilePrivacy={postcard.profilePrivacy || 'public'}
+                      showStamp={postcard.showStamp}
+                      creatorRole={postcard.creatorRole}
+                      creatorIsPremium={postcard.creatorIsPremium}
                     />
                   ))}
                 </div>
@@ -465,6 +468,9 @@ export const Explore = () => {
                       collectionPrivacy={postcard.collectionPrivacy || 'public'}
                       collectionVisibility={postcard.collectionVisibility || 'public'}
                       profilePrivacy={postcard.profilePrivacy || 'public'}
+                      showStamp={postcard.showStamp}
+                      creatorRole={postcard.creatorRole}
+                      creatorIsPremium={postcard.creatorIsPremium}
                     />
                   ))}
                 </div>

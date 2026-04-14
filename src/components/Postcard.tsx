@@ -40,6 +40,9 @@ interface PostcardProps {
   collectionVisibility?: string;
   folioToken?: string;
   profilePrivacy?: string;
+  showStamp?: boolean;
+  creatorRole?: string;
+  creatorIsPremium?: boolean;
 }
 
 export const Postcard = ({ 
@@ -57,7 +60,10 @@ export const Postcard = ({
   collectionPrivacy,
   collectionVisibility,
   folioToken,
-  profilePrivacy
+  profilePrivacy,
+  showStamp = true,
+  creatorRole,
+  creatorIsPremium = false
 }: PostcardProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [liked, setLiked] = useState(false);
@@ -268,14 +274,62 @@ export const Postcard = ({
         )}
         
         {/* Stamp/Postmark Overlay */}
-        {!isPremium && (
+        {(creatorRole === 'admin' || creatorIsPremium) ? (showStamp !== false && (
           <div className="absolute top-6 right-6 w-24 h-24 opacity-40 pointer-events-none rotate-12">
             <svg viewBox="0 0 100 100" className="w-full h-full fill-charcoal">
-              <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
-              <text x="50" y="45" textAnchor="middle" className="text-[10px] font-serif uppercase tracking-tighter">Folio</text>
-              <text x="50" y="60" textAnchor="middle" className="text-[8px] font-sans uppercase tracking-widest">
-                {formatDate(date, { month: 'short', year: '2-digit' })}
-              </text>
+              {location ? (
+                <>
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2" />
+                  <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                  <path id={`curve-${id}`} d="M 20,50 A 30,30 0 1,1 80,50" fill="transparent" />
+                  <text className="text-[5px] uppercase tracking-[0.2em] font-bold">
+                    <textPath href={`#curve-${id}`} startOffset="50%" textAnchor="middle">
+                      {location.split(',')[0].slice(0, 25)}
+                    </textPath>
+                  </text>
+                  <text x="50" y="55" textAnchor="middle" className="text-[10px] font-serif uppercase tracking-tighter">Folio</text>
+                  <text x="50" y="70" textAnchor="middle" className="text-[6px] font-sans uppercase tracking-widest">
+                    {formatDate(date, { month: 'short', year: '2-digit' })}
+                  </text>
+                </>
+              ) : (
+                <>
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
+                  <text x="50" y="45" textAnchor="middle" className="text-[10px] font-serif uppercase tracking-tighter">Folio</text>
+                  <text x="50" y="60" textAnchor="middle" className="text-[8px] font-sans uppercase tracking-widest">
+                    {formatDate(date, { month: 'short', year: '2-digit' })}
+                  </text>
+                </>
+              )}
+            </svg>
+          </div>
+        )) : (
+          <div className="absolute top-6 right-6 w-24 h-24 opacity-40 pointer-events-none rotate-12">
+            <svg viewBox="0 0 100 100" className="w-full h-full fill-charcoal">
+              {location ? (
+                <>
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2" />
+                  <circle cx="50" cy="50" r="38" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                  <path id={`curve-free-${id}`} d="M 20,50 A 30,30 0 1,1 80,50" fill="transparent" />
+                  <text className="text-[5px] uppercase tracking-[0.2em] font-bold">
+                    <textPath href={`#curve-free-${id}`} startOffset="50%" textAnchor="middle">
+                      {location.split(',')[0].slice(0, 25)}
+                    </textPath>
+                  </text>
+                  <text x="50" y="55" textAnchor="middle" className="text-[10px] font-serif uppercase tracking-tighter">Folio</text>
+                  <text x="50" y="70" textAnchor="middle" className="text-[6px] font-sans uppercase tracking-widest">
+                    {formatDate(date, { month: 'short', year: '2-digit' })}
+                  </text>
+                </>
+              ) : (
+                <>
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
+                  <text x="50" y="45" textAnchor="middle" className="text-[10px] font-serif uppercase tracking-tighter">Folio</text>
+                  <text x="50" y="60" textAnchor="middle" className="text-[8px] font-sans uppercase tracking-widest">
+                    {formatDate(date, { month: 'short', year: '2-digit' })}
+                  </text>
+                </>
+              )}
             </svg>
           </div>
         )}
