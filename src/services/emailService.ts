@@ -130,9 +130,11 @@ export async function sendInviteEmail({
     });
 
     if (error) {
-      console.error('Resend error:', error);
+      console.error('Resend API Error Response:', JSON.stringify(error, null, 2));
       return { error: error.message };
     }
+    
+    console.log('Resend Success Response:', JSON.stringify(data, null, 2));
     return { success: true, data };
   } catch (error: any) {
     console.error('Error sending invite email:', error);
@@ -185,9 +187,11 @@ export async function sendOtpEmail({
     });
 
     if (error) {
-      console.error('Resend error:', error);
+      console.error('Resend API Error Response:', JSON.stringify(error, null, 2));
       return { error: error.message };
     }
+    
+    console.log('Resend Success Response:', JSON.stringify(data, null, 2));
     return { success: true, data };
   } catch (error: any) {
     console.error('Error sending OTP email:', error);
