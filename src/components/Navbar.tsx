@@ -283,8 +283,8 @@ export const Navbar = ({ user, userProfile, onLogin, onLogout, onCreate, onFeedb
                   )}
                 >
                   <div className="w-8 h-8 rounded-full bg-charcoal/5 flex items-center justify-center overflow-hidden">
-                    {user.photoURL ? (
-                      <img src={user.photoURL} alt={user.displayName} className="w-full h-full object-cover" />
+                    {userProfile?.photoURL || user.photoURL ? (
+                      <img src={userProfile?.photoURL || user.photoURL} alt={user.displayName} className="w-full h-full object-cover" />
                     ) : (
                       <UserCircle size={24} className="text-charcoal/20" />
                     )}
@@ -462,8 +462,8 @@ export const Navbar = ({ user, userProfile, onLogin, onLogout, onCreate, onFeedb
                 <div className="p-8 border-t border-charcoal/5 bg-charcoal/[0.02]">
                   <div className="flex items-center gap-4 mb-6">
                     <div className="w-12 h-12 rounded-full bg-charcoal/5 overflow-hidden">
-                      {user.photoURL ? (
-                        <img src={user.photoURL} alt={user.displayName} className="w-full h-full object-cover" />
+                      {userProfile?.photoURL || user.photoURL ? (
+                        <img src={userProfile?.photoURL || user.photoURL} alt={user.displayName} className="w-full h-full object-cover" />
                       ) : (
                         <UserCircle size={48} className="text-charcoal/10" />
                       )}

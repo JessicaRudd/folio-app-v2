@@ -255,6 +255,7 @@ export const ProfilePage = () => {
     <div className="min-h-screen bg-canvas flex flex-col">
       <Navbar 
         user={auth.currentUser} 
+        userProfile={profile}
         onLogin={() => {}} 
         onLogout={() => auth.signOut()} 
         onCreate={() => navigate('/')} 
