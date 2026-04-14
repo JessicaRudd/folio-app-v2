@@ -20,9 +20,9 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Use the database ID from environment variables, or undefined for (default)
-const databaseId = (import.meta as any).env?.VITE_FIREBASE_FIRESTORE_DATABASE_ID === '(default)' 
+const databaseId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID === '(default)' 
   ? undefined 
-  : (import.meta as any).env?.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
+  : import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
 export const db = getFirestore(app, databaseId);
 console.log("Firestore Instance Initialized with DB ID:", databaseId || "(default)");
 export const storage = getStorage(app);
