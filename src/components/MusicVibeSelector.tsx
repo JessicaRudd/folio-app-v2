@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Music, Search, X, Check, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Music, Search, X, Check, AlertCircle, Loader2, Play } from 'lucide-react';
 import { Button } from './ui/Button';
+import { cn } from '../lib/utils';
 
 interface MusicVibe {
   service: 'spotify' | 'apple-music';
@@ -21,14 +22,51 @@ interface MusicVibeSelectorProps {
 export const MusicVibeSelector = ({ onSelect, initialVibe }: MusicVibeSelectorProps) => {
   const [url, setUrl] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<MusicVibe | null>(initialVibe || null);
+  const [searchResults, setSearchResults] = useState<MusicVibe[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (initialVibe) {
       setUrl(initialVibe.url);
     }
   }, [initialVibe]);
+
+  const searchAppleMusic = async (query: string) => {
+    if (!query || query.length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=5`);
+      const data = await response.json();
+      
+      if (data.results) {
+        const vibes: MusicVibe[] = data.results.map((item: any) => ({
+          service: 'apple-music',
+          type: 'track',
+          id: item.trackId.toString(),
+          url: item.trackViewUrl,
+          title: item.trackName,
+          artist: item.artistName,
+          artworkUrl: item.artworkUrl100?.replace('100x100', '600x600'),
+          previewUrl: item.previewUrl
+        }));
+        setSearchResults(vibes);
+        setShowResults(vibes.length > 0);
+      }
+    } catch (err) {
+      console.error('Search failed:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const fetchMetadata = async (vibe: MusicVibe) => {
     setIsParsing(true);
@@ -99,12 +137,10 @@ export const MusicVibeSelector = ({ onSelect, initialVibe }: MusicVibeSelectorPr
       // Apple Music
       if (urlObj.hostname.includes('music.apple.com')) {
         const parts = urlObj.pathname.split('/').filter(Boolean);
-        // /us/album/name/id or /us/playlist/name/id
         if (parts.length >= 4) {
           const type = parts[1] as any;
           const id = parts[3];
           if (['track', 'playlist', 'album'].includes(type) || type === 'album') {
-            // Apple Music track IDs are often in the query param ?i=...
             const trackId = urlObj.searchParams.get('i');
             return {
               service: 'apple-music',
@@ -131,19 +167,40 @@ export const MusicVibeSelector = ({ onSelect, initialVibe }: MusicVibeSelectorPr
     if (!val) {
       setPreview(null);
       onSelect(null);
+      setSearchResults([]);
+      setShowResults(false);
       return;
     }
 
-    const parsed = parseUrl(val);
-    if (parsed) {
-      setPreview(parsed);
-      fetchMetadata(parsed);
-    } else {
-      setPreview(null);
-      if (val.length > 10) {
-        setError('Invalid Spotify or Apple Music URL');
+    // Check if it's a URL
+    const isUrl = val.startsWith('http://') || val.startsWith('https://');
+
+    if (isUrl) {
+      const parsed = parseUrl(val);
+      if (parsed) {
+        setPreview(parsed);
+        fetchMetadata(parsed);
+        setShowResults(false);
+      } else {
+        setPreview(null);
+        if (val.length > 15) {
+          setError('Invalid Spotify or Apple Music URL');
+        }
       }
+    } else {
+      // It's a search query
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = setTimeout(() => {
+        searchAppleMusic(val);
+      }, 500);
     }
+  };
+
+  const selectResult = (vibe: MusicVibe) => {
+    setPreview(vibe);
+    setUrl(vibe.url);
+    onSelect(vibe);
+    setShowResults(false);
   };
 
   const clear = () => {
@@ -151,6 +208,8 @@ export const MusicVibeSelector = ({ onSelect, initialVibe }: MusicVibeSelectorPr
     setPreview(null);
     setError(null);
     onSelect(null);
+    setSearchResults([]);
+    setShowResults(false);
   };
 
   return (
@@ -176,12 +235,35 @@ export const MusicVibeSelector = ({ onSelect, initialVibe }: MusicVibeSelectorPr
             type="text"
             value={url}
             onChange={handleUrlChange}
-            placeholder="Paste a Spotify or Apple Music link..."
+            onFocus={() => searchResults.length > 0 && setShowResults(true)}
+            placeholder="Search Apple Music or paste a link..."
             className="w-full bg-charcoal/5 border border-transparent focus:border-sage/20 focus:bg-white rounded-xl py-3 pl-10 pr-10 text-sm outline-none transition-all"
           />
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal/30">
-            {isParsing ? <Loader2 size={16} className="animate-spin text-sage" /> : <Search size={16} />}
+            {isParsing || isSearching ? <Loader2 size={16} className="animate-spin text-sage" /> : <Search size={16} />}
           </div>
+          
+          {showResults && (
+            <div className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-charcoal/5 overflow-hidden">
+              {searchResults.map((result) => (
+                <button
+                  key={result.id}
+                  onClick={() => selectResult(result)}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-canvas transition-colors text-left"
+                >
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-charcoal/5 shrink-0">
+                    {result.artworkUrl && <img src={result.artworkUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-serif truncate">{result.title}</div>
+                    <div className="text-[10px] text-charcoal/40 truncate italic">{result.artist}</div>
+                  </div>
+                  <Play size={12} className="text-sage opacity-0 group-hover:opacity-100" />
+                </button>
+              ))}
+            </div>
+          )}
+
           {error && (
             <div className="flex items-center gap-1.5 mt-2 text-red-500">
               <AlertCircle size={12} />
@@ -222,7 +304,7 @@ export const MusicVibeSelector = ({ onSelect, initialVibe }: MusicVibeSelectorPr
       )}
 
       <p className="text-[10px] text-charcoal/30 italic">
-        Link a song or playlist to set the mood. Visitors can unmute to hear a preview.
+        Link a song or search Apple Music to set the mood.
       </p>
     </div>
   );

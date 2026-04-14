@@ -184,15 +184,74 @@ export const socialService = {
     const followerId = auth.currentUser.uid;
     if (followerId === followingId) return;
 
+    // Check if allowed to follow
+    let targetUserDoc;
+    try {
+      targetUserDoc = await getDoc(doc(db, 'users', followingId));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, `users/${followingId}`);
+      return;
+    }
+    
+    if (!targetUserDoc.exists()) return;
+    
+    const targetData = targetUserDoc.data();
+    const isPublic = targetData.profilePrivacy === 'public';
+    
+    if (!isPublic) {
+      // Check if invited as curator
+      const curatorQuery = query(
+        collection(db, 'collections'),
+        where('creatorId', '==', followingId),
+        where('curatorIds', 'array-contains', followerId),
+        limit(1)
+      );
+      
+      let curatorSnap;
+      try {
+        curatorSnap = await getDocs(curatorQuery);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'collections_curator_check');
+        return;
+      }
+      
+      // Check if invited as guest
+      const guestQuery = query(
+        collection(db, 'shares'),
+        where('userId', '==', followingId), // The person who shared
+        where('email', '==', auth.currentUser.email?.toLowerCase()),
+        limit(1)
+      );
+      
+      let guestSnap;
+      try {
+        guestSnap = await getDocs(guestQuery);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'shares_guest_check');
+        return;
+      }
+
+      if (curatorSnap.empty && guestSnap.empty) {
+        throw new Error('You must be invited to this curator\'s collection to follow them.');
+      }
+    }
+
     const followDocId = `${followerId}_${followingId}`;
     const followRef = doc(db, 'follows', followDocId);
-    const followSnap = await getDoc(followRef);
+    
+    let followSnap;
+    try {
+      followSnap = await getDoc(followRef);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.GET, `follows/${followDocId}`);
+      return;
+    }
+    
     const isFollowing = followSnap.exists();
 
     const batch = writeBatch(db);
     
     // Fetch usernames and check if public profiles exist
-    // We use try-catch because we might not have permission to read the other user's doc
     let followerUsername = null;
     let targetUsername = followingUsername || null;
 
@@ -214,17 +273,30 @@ export const socialService = {
 
     // Fallback for target username if not provided and couldn't read user doc
     if (!targetUsername) {
-      const q = query(collection(db, 'public_profiles'), where('uid', '==', followingId), limit(1));
-      const qSnap = await getDocs(q);
-      if (!qSnap.empty) {
-        targetUsername = qSnap.docs[0].id;
+      try {
+        const q = query(collection(db, 'public_profiles'), where('uid', '==', followingId), limit(1));
+        const qSnap = await getDocs(q);
+        if (!qSnap.empty) {
+          targetUsername = qSnap.docs[0].id;
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'public_profiles_fallback');
       }
     }
 
-    const [followerPublicSnap, followingPublicSnap] = await Promise.all([
-      followerUsername ? getDoc(doc(db, 'public_profiles', followerUsername)) : Promise.resolve(null),
-      targetUsername ? getDoc(doc(db, 'public_profiles', targetUsername)) : Promise.resolve(null)
-    ]);
+    let followerPublicSnap = null;
+    let followingPublicSnap = null;
+
+    try {
+      const results = await Promise.all([
+        followerUsername ? getDoc(doc(db, 'public_profiles', followerUsername)) : Promise.resolve(null),
+        targetUsername ? getDoc(doc(db, 'public_profiles', targetUsername)) : Promise.resolve(null)
+      ]);
+      followerPublicSnap = results[0];
+      followingPublicSnap = results[1];
+    } catch (err) {
+      console.warn('Could not fetch public profiles for count update');
+    }
 
     if (isFollowing) {
       // Unfollow

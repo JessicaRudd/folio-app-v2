@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus, Share2, Check } from 'lucide-react';
-import { auth, db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { User, MapPin, Loader2, ArrowLeft, Globe, Calendar, UserPlus, UserMinus, Share2, Check, Lock } from 'lucide-react';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serverTimestamp, onSnapshot, limit } from 'firebase/firestore';
 import { CollectionGrid } from './CollectionGrid';
 import { ShareModal } from './ShareModal';
 import { Button } from './ui/Button';
@@ -62,27 +62,64 @@ export const PublicProfile = () => {
       try {
         let userData: any = null;
         let userId: string = '';
+        let isPrivate = false;
 
         if (profileSnapshot.exists()) {
           userData = profileSnapshot.data();
           userId = userData.uid;
         } else {
-          // Fallback: Check users collection for legacy users (one-time check)
+          // Check users collection for the username
           const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('username', '==', username), where('profilePrivacy', '==', 'public'));
-          const querySnapshot = await getDocs(q);
-          
-          if (querySnapshot.empty) {
-            setError('User not found or profile is private');
+          const q = query(usersRef, where('username', '==', username));
+      try {
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          setError('User not found');
+          setLoading(false);
+          return;
+        }
+        
+        userData = querySnapshot.docs[0].data();
+        userId = querySnapshot.docs[0].id;
+        isPrivate = userData.profilePrivacy !== 'public';
+
+        if (isPrivate) {
+          // Check if current user is invited
+          if (!currentUser) {
+            setError('This profile is private. Please log in to see if you have access.');
             setLoading(false);
             return;
           }
+
+          const curatorQuery = query(
+            collection(db, 'collections'),
+            where('creatorId', '==', userId),
+            where('curatorIds', 'array-contains', currentUser.uid),
+            limit(1)
+          );
+          const curatorSnap = await getDocs(curatorQuery);
           
-          userData = querySnapshot.docs[0].data();
-          userId = querySnapshot.docs[0].id;
+          const guestQuery = query(
+            collection(db, 'shares'),
+            where('userId', '==', userId),
+            where('email', '==', currentUser.email?.toLowerCase()),
+            limit(1)
+          );
+          const guestSnap = await getDocs(guestQuery);
+
+          if (curatorSnap.empty && guestSnap.empty) {
+            setError('This profile is private and you haven\'t been invited to any of their collections.');
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.LIST, 'users_by_username');
+      }
         }
 
-        setUserProfile({ id: userId, ...userData });
+        setUserProfile({ id: userId, ...userData, isPrivate });
 
         // 2. Fetch public collections for this user
         const collectionsRef = collection(db, 'collections');
@@ -91,15 +128,20 @@ export const PublicProfile = () => {
           where('creatorId', '==', userId),
           where('visibility', '==', 'public')
         );
-        const collectionsSnapshot = await getDocs(collectionsQuery);
-        const collections = collectionsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          collectionDate: doc.data().collectionDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-          createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
-        }));
+        
+        try {
+          const collectionsSnapshot = await getDocs(collectionsQuery);
+          const collections = collectionsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            collectionDate: doc.data().collectionDate || doc.data().createdAt?.toDate?.()?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+            createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString()
+          }));
 
-        setPublicCollections(collections);
+          setPublicCollections(collections);
+        } catch (err) {
+          handleFirestoreError(err, OperationType.LIST, 'public_collections');
+        }
 
         // 3. Check if following
         if (auth.currentUser) {
@@ -133,8 +175,9 @@ export const PublicProfile = () => {
         ...prev,
         follower_count: (prev.follower_count || 0) + (isNowFollowing ? 1 : -1)
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error toggling follow:', err);
+      alert(err.message || 'Failed to follow user.');
     } finally {
       setFollowLoading(false);
     }
@@ -250,7 +293,15 @@ export const PublicProfile = () => {
             
             <div className="flex-1 text-center md:text-left space-y-4">
               <div className="space-y-1">
-                <h1 className="text-4xl md:text-5xl font-serif">{userProfile.displayName}</h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-4xl md:text-5xl font-serif">{userProfile.displayName}</h1>
+                  {userProfile.isPrivate && (
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-charcoal/5 rounded-md text-[10px] font-bold uppercase tracking-widest text-charcoal/40">
+                      <Lock size={10} />
+                      Private
+                    </div>
+                  )}
+                </div>
                 <p className="text-sage font-bold tracking-widest text-sm uppercase">@{userProfile.username}</p>
               </div>
               

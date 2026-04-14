@@ -80,13 +80,7 @@ export const Explore = () => {
 
           setPublicCollections(collections);
         } catch (err: any) {
-          console.error('Error fetching public collections:', err);
-          console.error('Error details:', {
-            message: err.message,
-            code: err.code,
-            stack: err.stack
-          });
-          // Don't throw, just continue
+          handleFirestoreError(err, OperationType.LIST, 'public_collections');
         }
 
         // 2. Fetch Public Curators
@@ -105,7 +99,7 @@ export const Explore = () => {
           }));
           setPublicCurators(curators);
         } catch (err: any) {
-          console.error('Error fetching public curators:', err);
+          handleFirestoreError(err, OperationType.LIST, 'public_curators');
         }
 
         // 3. Fetch Public Postcards (for everyone)
@@ -125,12 +119,7 @@ export const Explore = () => {
           }));
           setPublicPostcards(publicPostcards);
         } catch (err: any) {
-          console.error('Error fetching public postcards:', err);
-          console.error('Error details:', {
-            message: err.message,
-            code: err.code,
-            stack: err.stack
-          });
+          handleFirestoreError(err, OperationType.LIST, 'public_postcards');
         }
 
         // 4. Fetch Personalized Feed if logged in
