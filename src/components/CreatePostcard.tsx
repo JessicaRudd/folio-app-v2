@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Image as ImageIcon, Music, MapPin, Send, Loader2, Plus, ChevronLeft, ChevronRight, Navigation, Globe, Lock, Users } from 'lucide-react';
+import { X, Image as ImageIcon, Music, MapPin, Send, Loader2, Plus, ChevronLeft, ChevronRight, Navigation, Globe, Lock, Users, Heart, MessageCircle } from 'lucide-react';
 import { Button } from './ui/Button';
 import { db, storage, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc, increment, getDoc, writeBatch } from 'firebase/firestore';
@@ -383,7 +383,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           coverImage: downloadUrls[newCollectionCoverIndex] || downloadUrls[0],
           creatorId: auth.currentUser!.uid,
           creatorName: userStats?.displayName || auth.currentUser!.displayName || '',
-          creatorUsername: userData?.username || '',
+          creatorUsername: userStats?.username || '',
           allowLikes: newCollectionAllowLikes,
           allowComments: newCollectionAllowComments,
           createdAt: serverTimestamp(),
@@ -425,6 +425,7 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
       console.log('Creating Firestore document...');
       
       // Get collection visibility for denormalization
+      let collectionVisibility = 'private';
       let collectionPrivacy = 'private';
       let folioToken = folioMetadata?.shareToken || '';
       let allowLikes = true;

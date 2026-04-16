@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Image as ImageIcon, Loader2, Save, MapPin, Lock, Users, Globe, Plus, Trash2 } from 'lucide-react';
+import { X, Image as ImageIcon, Loader2, Save, MapPin, Lock, Users, Globe, Plus, Trash2, Heart, MessageCircle } from 'lucide-react';
 import { Button } from './ui/Button';
 import { db, storage, auth } from '../lib/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, getDoc, deleteDoc, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
