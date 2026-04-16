@@ -96,7 +96,7 @@ export const ProfilePage = () => {
     setFoundUser(null);
     try {
       // Search by username in public_profiles
-      const profileDoc = await getDoc(doc(db, 'public_profiles', adminSearch.trim()));
+      const profileDoc = await getDoc(doc(db, 'public_profiles', adminSearch.trim().toLowerCase()));
       if (profileDoc.exists()) {
         const uid = profileDoc.data().uid;
         const userDoc = await getDoc(doc(db, 'users', uid));
@@ -164,7 +164,7 @@ export const ProfilePage = () => {
 
       // Sync Public Profile
       if (profile.profilePrivacy === 'public' && profile.username) {
-        await setDoc(doc(db, 'public_profiles', profile.username), {
+        await setDoc(doc(db, 'public_profiles', profile.username.toLowerCase()), {
           uid: auth.currentUser.uid,
           ...editableData,
           follower_count: profile.follower_count || 0,
@@ -199,7 +199,7 @@ export const ProfilePage = () => {
         // Remove from public profiles if it exists
         try {
           const { deleteDoc, collection, query, where, getDocs, writeBatch } = await import('firebase/firestore');
-          await deleteDoc(doc(db, 'public_profiles', profile.username));
+          await deleteDoc(doc(db, 'public_profiles', profile.username.toLowerCase()));
           
           // Also update all collections and postcards with the new profile privacy
           const collectionsQuery = query(collection(db, 'collections'), where('creatorId', '==', auth.currentUser.uid));

@@ -49,7 +49,7 @@ export const Seeder = () => {
       }, { merge: true });
 
       // 2. Create Fake Public Profile
-      await setDoc(doc(db, 'public_profiles', fakeUsername), {
+      await setDoc(doc(db, 'public_profiles', fakeUsername.toLowerCase()), {
         uid: fakeUid,
         displayName: 'The Traveler',
         username: fakeUsername,
