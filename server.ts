@@ -176,7 +176,13 @@ async function startServer() {
           }
         }
       } catch (e) {
-        console.error("Error verifying admin role:", e);
+        console.error("Error verifying admin role:", {
+          error: e.message,
+          code: e.code,
+          projectId: adminApp.options.projectId || process.env.GCLOUD_PROJECT,
+          databaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || '(default)'
+        });
+
       }
     }
 
@@ -238,7 +244,14 @@ async function startServer() {
           }
         }
       } catch (e) {
-        console.error("Error verifying admin role:", e);
+        console.error("Error verifying admin role (Approve):", {
+          error: e.message,
+          code: e.code,
+          adminUid,
+          projectId: adminApp.options.projectId || process.env.GCLOUD_PROJECT,
+          databaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID || '(default)'
+        });
+
       }
     }
 
