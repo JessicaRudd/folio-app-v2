@@ -596,6 +596,8 @@ export const GuestView = () => {
                 showStamp={postcard.showStamp}
                 creatorRole={postcard.creatorRole}
                 creatorIsPremium={postcard.creatorIsPremium}
+                allowLikes={collectionData?.allowLikes}
+                allowComments={collectionData?.allowComments}
               />
             ))}
           </div>

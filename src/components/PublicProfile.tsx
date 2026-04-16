@@ -316,14 +316,18 @@ export const PublicProfile = () => {
                   <Globe size={14} className="text-sage" />
                   {publicCollections.length} Public Collections
                 </div>
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
-                  <User size={14} className="text-sage" />
-                  {userProfile.follower_count || 0} Followers
-                </div>
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
-                  <UserPlus size={14} className="text-sage" />
-                  {userProfile.following_count || 0} Following
-                </div>
+                {currentUser?.uid === userProfile.id && (
+                  <>
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
+                      <User size={14} className="text-sage" />
+                      {userProfile.follower_count || 0} Followers
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
+                      <UserPlus size={14} className="text-sage" />
+                      {userProfile.following_count || 0} Following
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-charcoal/40">
                   <Calendar size={14} className="text-sage" />
                   Joined {userProfile.createdAt ? new Date(userProfile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown'}
