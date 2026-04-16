@@ -3,7 +3,9 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 // In Google Cloud environments, initialize with no arguments to use default credentials and project.
 if (!admin.apps.length) {
-  admin.initializeApp();
+  admin.initializeApp({
+    projectId: process.env.GOOGLE_CLOUD_PROJECT
+  });
 }
 
 export const adminApp = admin.app();
