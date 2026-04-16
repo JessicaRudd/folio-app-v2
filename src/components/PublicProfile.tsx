@@ -56,7 +56,7 @@ export const PublicProfile = () => {
     setError(null);
 
     // 1. Find user by username in public_profiles
-    const profileRef = doc(db, 'public_profiles', username);
+    const profileRef = doc(db, 'public_profiles', username.toLowerCase());
     
     const unsubscribe = onSnapshot(profileRef, async (profileSnapshot) => {
       try {
@@ -68,7 +68,7 @@ export const PublicProfile = () => {
           userData = profileSnapshot.data();
           userId = userData.uid;
         } else {
-          // Check users collection for the username
+          // Check users collection (fallback)
           const usersRef = collection(db, 'users');
           const q = query(usersRef, where('username', '==', username));
       try {
@@ -126,7 +126,7 @@ export const PublicProfile = () => {
         const collectionsQuery = query(
           collectionsRef, 
           where('creatorId', '==', userId),
-          where('visibility', '==', 'public')
+          where('privacy', '==', 'public')
         );
         
         try {
