@@ -76,7 +76,7 @@ export const CollectionView = () => {
         const usersRef = collection(db, 'users');
         const q = query(
           usersRef, 
-          where('username', '==', username)
+          where('username', '==', username.toLowerCase())
         );
         
         let userSnap: any = null;
@@ -95,7 +95,8 @@ export const CollectionView = () => {
         }
 
         // If we have a token, we can try to get user info from the token if userSnap is empty or denied
-        if (token) {
+        // Only do this for general folio links (NOT for individual invites which use their own shareId validation)
+        if (token && !shareId) {
           const tokenSnap = await getDoc(doc(db, 'folio_tokens', token));
           
           if (!tokenSnap.exists()) {
