@@ -43,6 +43,8 @@ interface PostcardProps {
   showStamp?: boolean;
   creatorRole?: string;
   creatorIsPremium?: boolean;
+  allowLikes?: boolean;
+  allowComments?: boolean;
 }
 
 export const Postcard = ({ 
@@ -63,7 +65,9 @@ export const Postcard = ({
   profilePrivacy,
   showStamp = true,
   creatorRole,
-  creatorIsPremium = false
+  creatorIsPremium = false,
+  allowLikes = true,
+  allowComments = true
 }: PostcardProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [liked, setLiked] = useState(false);
@@ -356,31 +360,35 @@ export const Postcard = ({
             </div>
           </div>
           <div className="flex gap-2">
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-bold text-charcoal/30">{likeCount}</span>
+            {allowLikes && (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-charcoal/30">{likeCount}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="rounded-full p-2"
+                  onClick={handleLike}
+                >
+                  <Heart 
+                    size={20} 
+                    className={cn(
+                      "transition-all duration-300",
+                      liked ? "fill-red-500 text-red-500 scale-110" : "text-charcoal/40 hover:text-red-500"
+                    )} 
+                  />
+                </Button>
+              </div>
+            )}
+            {allowComments && (
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="rounded-full p-2"
-                onClick={handleLike}
+                onClick={() => setShowComments(true)}
               >
-                <Heart 
-                  size={20} 
-                  className={cn(
-                    "transition-all duration-300",
-                    liked ? "fill-red-500 text-red-500 scale-110" : "text-charcoal/40 hover:text-red-500"
-                  )} 
-                />
+                <MessageCircle size={20} className="text-charcoal/40 hover:text-sage transition-colors" />
               </Button>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="rounded-full p-2"
-              onClick={() => setShowComments(true)}
-            >
-              <MessageCircle size={20} className="text-charcoal/40 hover:text-sage transition-colors" />
-            </Button>
+            )}
             {showShare && (
               <Button 
                 variant="ghost" 

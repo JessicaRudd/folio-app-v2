@@ -274,6 +274,8 @@ export const PublicCollectionView = () => {
               showStamp={postcard.showStamp}
               creatorRole={postcard.creatorRole}
               creatorIsPremium={postcard.creatorIsPremium}
+              allowLikes={collectionData?.allowLikes}
+              allowComments={collectionData?.allowComments}
             />
           </motion.div>
         ))}

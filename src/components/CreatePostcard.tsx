@@ -57,6 +57,8 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
   const [newUserEmail, setNewUserEmail] = useState('');
   const [selectedCollectionData, setSelectedCollectionData] = useState<any>(null);
   const [updateExistingCollection, setUpdateExistingCollection] = useState(false);
+  const [newCollectionAllowLikes, setNewCollectionAllowLikes] = useState(true);
+  const [newCollectionAllowComments, setNewCollectionAllowComments] = useState(true);
 
   // Geolocation State
   const [isLocating, setIsLocating] = useState(false);
@@ -381,7 +383,9 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           coverImage: downloadUrls[newCollectionCoverIndex] || downloadUrls[0],
           creatorId: auth.currentUser!.uid,
           creatorName: userStats?.displayName || auth.currentUser!.displayName || '',
-          creatorUsername: userStats?.username || '',
+          creatorUsername: userData?.username || '',
+          allowLikes: newCollectionAllowLikes,
+          allowComments: newCollectionAllowComments,
           createdAt: serverTimestamp(),
           collectionDate: postcardDate,
           postcardCount: 0,
@@ -421,9 +425,10 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
       console.log('Creating Firestore document...');
       
       // Get collection visibility for denormalization
-      let collectionVisibility = 'private';
       let collectionPrivacy = 'private';
       let folioToken = folioMetadata?.shareToken || '';
+      let allowLikes = true;
+      let allowComments = true;
       
       if (finalCollectionId !== 'loose-leaves') {
         const collectionSnap = await getDoc(doc(db, 'collections', finalCollectionId));
@@ -432,6 +437,8 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           collectionVisibility = cData.visibility || 'private';
           collectionPrivacy = cData.privacy || 'private';
           folioToken = cData.folioToken || folioToken;
+          allowLikes = cData.allowLikes ?? true;
+          allowComments = cData.allowComments ?? true;
 
           // Update existing collection if requested
           if (updateExistingCollection) {
@@ -480,6 +487,8 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
           visibilityList: [], 
           collectionVisibility,
           collectionPrivacy,
+          allowLikes,
+          allowComments,
           folioToken: folioToken || '',
           profilePrivacy: userStats?.profilePrivacy || 'private',
           showStamp: (userStats?.role === 'admin' || userStats?.isPremium) ? showStamp : true,
@@ -728,6 +737,51 @@ export const CreatePostcard = ({ onClose, onSuccess, onLimitReached }: CreatePos
                           >
                             <Globe size={14} className={newCollectionPrivacy === 'public' ? "text-sage" : "text-charcoal/40"} />
                             <span className="text-[10px] font-bold">Public</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* New Collection Interaction Settings */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-charcoal/5">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("p-2 rounded-lg", newCollectionAllowLikes ? "bg-sage/10 text-sage" : "bg-charcoal/5 text-charcoal/40")}>
+                              <Heart size={16} />
+                            </div>
+                            <div className="text-[10px] font-bold uppercase tracking-widest">Likes</div>
+                          </div>
+                          <button 
+                            onClick={() => setNewCollectionAllowLikes(!newCollectionAllowLikes)}
+                            className={cn(
+                              "w-10 h-5 rounded-full transition-colors relative",
+                              newCollectionAllowLikes ? "bg-sage" : "bg-charcoal/20"
+                            )}
+                          >
+                            <div className={cn(
+                              "absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all",
+                              newCollectionAllowLikes ? "left-5.5" : "left-0.5"
+                            )} />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-white/50 rounded-xl border border-charcoal/5">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("p-2 rounded-lg", newCollectionAllowComments ? "bg-sage/10 text-sage" : "bg-charcoal/5 text-charcoal/40")}>
+                              <MessageCircle size={16} />
+                            </div>
+                            <div className="text-[10px] font-bold uppercase tracking-widest">Comments</div>
+                          </div>
+                          <button 
+                            onClick={() => setNewCollectionAllowComments(!newCollectionAllowComments)}
+                            className={cn(
+                              "w-10 h-5 rounded-full transition-colors relative",
+                              newCollectionAllowComments ? "bg-sage" : "bg-charcoal/20"
+                            )}
+                          >
+                            <div className={cn(
+                              "absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all",
+                              newCollectionAllowComments ? "left-5.5" : "left-0.5"
+                            )} />
                           </button>
                         </div>
                       </div>
