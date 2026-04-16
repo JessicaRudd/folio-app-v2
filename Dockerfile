@@ -37,9 +37,11 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy package files and install production dependencies
-COPY package*.json ./
-RUN npm ci --omit=dev
+    # Copy only production dependencies from builder to save network time and avoid errors
+    COPY --from=builder /app/node_modules ./node_modules
+    COPY package*.json ./
+    # Prune any dev dependencies just to be safe, but this won't require a full re-download
+    RUN npm prune --omit=dev --no-audit
 
 # Copy built assets and server from builder
 COPY --from=builder /app/dist ./dist
