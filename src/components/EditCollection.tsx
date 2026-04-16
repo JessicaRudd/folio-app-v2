@@ -36,6 +36,8 @@ interface EditCollectionProps {
     creatorUsername?: string;
     folioToken?: string;
     musicVibe?: MusicVibe | null;
+    allowLikes?: boolean;
+    allowComments?: boolean;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -55,6 +57,8 @@ export const EditCollection = ({ collection: collectionData, onClose, onSuccess 
   const [newUserEmail, setNewUserEmail] = useState('');
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState(collectionData.coverImage);
+  const [allowLikes, setAllowLikes] = useState(collectionData.allowLikes !== false);
+  const [allowComments, setAllowComments] = useState(collectionData.allowComments !== false);
   const [collectionPhotos, setCollectionPhotos] = useState<string[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
@@ -330,6 +334,8 @@ export const EditCollection = ({ collection: collectionData, onClose, onSuccess 
         profilePrivacy: userProfile?.profilePrivacy || 'private',
         allowedUsers: privacy === 'personal' ? allowedUsers : [],
         folioToken: currentFolioToken || '',
+        allowLikes: allowLikes,
+        allowComments: allowComments,
         updatedAt: serverTimestamp()
       };
 
@@ -342,7 +348,9 @@ export const EditCollection = ({ collection: collectionData, onClose, onSuccess 
           batch.update(doc(db, 'postcards', p.id), {
             collectionPrivacy: privacy,
             collectionVisibility: newVisibility,
-            folioToken: currentFolioToken
+            folioToken: currentFolioToken,
+            allowLikes: allowLikes,
+            allowComments: allowComments
           });
         });
         await batch.commit();
@@ -639,6 +647,60 @@ export const EditCollection = ({ collection: collectionData, onClose, onSuccess 
                   <div className="text-[10px] text-charcoal/40">Visible on Explore</div>
                 </div>
               </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-charcoal/5">
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg", allowLikes ? "bg-sage/10 text-sage" : "bg-charcoal/5 text-charcoal/40")}>
+                    <Heart size={18} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold">Allow Likes</div>
+                    <div className="text-[10px] text-charcoal/40 uppercase font-bold tracking-widest">
+                      {allowLikes ? 'Enabled' : 'Disabled'}
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setAllowLikes(!allowLikes)}
+                  className={cn(
+                    "w-12 h-6 rounded-full transition-colors relative",
+                    allowLikes ? "bg-sage" : "bg-charcoal/20"
+                  )}
+                >
+                  <div className={cn(
+                    "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                    allowLikes ? "left-7" : "left-1"
+                  )} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-charcoal/5">
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg", allowComments ? "bg-sage/10 text-sage" : "bg-charcoal/5 text-charcoal/40")}>
+                    <MessageCircle size={18} />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold">Allow Comments</div>
+                    <div className="text-[10px] text-charcoal/40 uppercase font-bold tracking-widest">
+                      {allowComments ? 'Enabled' : 'Disabled'}
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setAllowComments(!allowComments)}
+                  className={cn(
+                    "w-12 h-6 rounded-full transition-colors relative",
+                    allowComments ? "bg-sage" : "bg-charcoal/20"
+                  )}
+                >
+                  <div className={cn(
+                    "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                    allowComments ? "left-7" : "left-1"
+                  )} />
+                </button>
+              </div>
             </div>
 
             {privacy === 'personal' && (
