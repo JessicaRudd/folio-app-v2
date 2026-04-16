@@ -208,7 +208,23 @@ export const Onboarding = ({ onClose, onSuccess, initialStep }: OnboardingProps)
 
       onSuccess();
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === 'auth/email-already-in-use') {
+        setError(
+          <div className="space-y-4">
+            <p>It looks like you've already started your journey! This account exists.</p>
+            <Button 
+              variant="outline" 
+              className="w-full py-4"
+              onClick={() => setStep('auth-password')}
+            >
+              Sign In with Password
+            </Button>
+          </div>
+        );
+      } else {
+        setError(err.message);
+      }
+
     } finally {
       setLoading(false);
     }

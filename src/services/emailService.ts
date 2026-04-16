@@ -9,7 +9,6 @@ function getResend() {
       console.warn('RESEND_API_KEY is not set. Emails will not be sent.');
       return null;
     }
-    console.log(`Initializing Resend client with API key starting with: ${apiKey.substring(0, 7)}... (Length: ${apiKey.length})`);
     resendClient = new Resend(apiKey);
   }
   return resendClient;
@@ -17,13 +16,11 @@ function getResend() {
 
 function getFromEmail() {
   const email = process.env.RESEND_FROM_EMAIL || 'Folio <hello@curateyourfolio.com>';
-  console.log(`Using FROM_EMAIL: ${email} (Length: ${email.length})`);
   return email;
 }
 
 function getBrandUrl() {
   const url = process.env.RESEND_BRAND_URL || 'https://curateyourfolio.com';
-  console.log(`Using BRAND_URL: ${url}`);
   return url;
 }
 
@@ -54,8 +51,6 @@ export async function sendInviteEmail({
     ? "You've received your stamp! 🕊️"
     : `Invite: View ${collectionTitle} on Folio`;
 
-  // Prioritize the environment variable BRAND_URL if it's explicitly set, 
-  // otherwise use the passed baseUrl (from request) or the default.
   const envBrandUrl = process.env.RESEND_BRAND_URL;
   const finalBaseUrl = envBrandUrl || baseUrl || getBrandUrl();
   const unlockUrl = `${finalBaseUrl}/unlock?token=${inviteToken}`;
@@ -63,11 +58,17 @@ export async function sendInviteEmail({
   const html = isEarlyAccess ? `
     <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto; padding: 60px 40px; background: #fdfcfb; color: #1a1a1a; border: 1px solid #eee; border-radius: 4px;">
       <div style="text-align: center; margin-bottom: 40px;">
-        <div style="display: inline-block; width: 60px; height: 60px; border: 2px dashed #1a1a1a; border-radius: 50%; padding: 5px; margin-bottom: 20px;">
-          <div style="width: 100%; height: 100%; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-            <span style="color: white; font-weight: bold; font-size: 24px;">F</span>
-          </div>
-        </div>
+        <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+          <tr>
+            <td style="border: 2px dashed #1a1a1a; border-radius: 50%; padding: 5px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="60" height="60" style="background: #1a1a1a; border-radius: 50%;">
+                <tr>
+                  <td align="center" valign="middle" style="color: white; font-weight: bold; font-size: 24px;">F</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </div>
       
       <h1 style="font-size: 28px; font-weight: normal; text-align: center; margin-bottom: 32px; letter-spacing: -0.02em;">You've received your stamp!</h1>
@@ -125,11 +126,10 @@ export async function sendInviteEmail({
     });
 
     if (error) {
-      console.error('Resend API Error Response:', JSON.stringify(error, null, 2));
+      console.error('Resend error:', error);
       return { error: error.message };
     }
     
-    console.log('Resend Success Response:', JSON.stringify(data, null, 2));
     return { success: true, data };
   } catch (error: any) {
     console.error('Error sending invite email:', error);
@@ -177,11 +177,10 @@ export async function sendOtpEmail({
     });
 
     if (error) {
-      console.error('Resend API Error Response:', JSON.stringify(error, null, 2));
+      console.error('Resend error:', error);
       return { error: error.message };
     }
     
-    console.log('Resend Success Response:', JSON.stringify(data, null, 2));
     return { success: true, data };
   } catch (error: any) {
     console.error('Error sending OTP email:', error);
@@ -207,11 +206,17 @@ export async function sendWelcomeEmail({
   const html = `
     <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto; padding: 60px 40px; background: #fdfcfb; color: #1a1a1a; border: 1px solid #eee; border-radius: 4px;">
       <div style="text-align: center; margin-bottom: 40px;">
-        <div style="display: inline-block; width: 60px; height: 60px; border: 2px dashed #1a1a1a; border-radius: 50%; padding: 5px; margin-bottom: 20px;">
-          <div style="width: 100%; height: 100%; background: #1a1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-            <span style="color: white; font-weight: bold; font-size: 24px;">F</span>
-          </div>
-        </div>
+        <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+          <tr>
+            <td style="border: 2px dashed #1a1a1a; border-radius: 50%; padding: 5px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="60" height="60" style="background: #1a1a1a; border-radius: 50%;">
+                <tr>
+                  <td align="center" valign="middle" style="color: white; font-weight: bold; font-size: 24px;">F</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </div>
       
       <h1 style="font-size: 28px; font-weight: normal; text-align: center; margin-bottom: 32px; letter-spacing: -0.02em;">Welcome to Folio${name ? `, ${name}` : ''}</h1>
